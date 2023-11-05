@@ -24,9 +24,10 @@ The objective of this research is to implement a downscaling technique that util
 
 The repository includes the Python scripts and Jupyter notebooks used for the implementation. The codebase is organized as follows:
 
-- `data_preprocessing/`: Scripts for data preprocessing, including handling standardized anomalies and preparing data for the U-Net model.
-- `model_training/`: Implementation of the U-Net architecture, training scripts, and model evaluation.
-- `inference/`: Code for performing inferences and generating downscaled temperature predictions.
+- `data/`: includes data files
+- `model/`: Implementation of the U-Net architecture.
+- `utility/`: 
+
 
 ## Requirements
 
