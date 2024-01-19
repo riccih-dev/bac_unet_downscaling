@@ -1,50 +1,10 @@
-from data_loader.cerra_loader import CerraDataLoader
-from data_loader.era5_loader import Era5DataLoader
+
 import xarray as xr
 from sklearn.model_selection import train_test_split
 
 # TODO
 # - create a better way to crop data (form each border equally)
 # - adjust splitting so it workds with correct years + test it 
-
-def load_era5_data():
-    """
-    Loads ERA5 data for the time period specified in the config file.
-    
-    Returns:
-    ---------- 
-    xr.Dataset: Xarray dataset containing temperature (t2m) data from ERA5.
-    xr.Dataset: Xarray dataset containing land surface model (LSM) data from ERA5.
-    xr.Dataset: Xarray dataset containing geopotential height (z) data from ERA5.
-    """
-
-    era5_loader= Era5DataLoader()
-
-    era5 = era5_loader.load_t2m_data()
-    era5_lsm = era5_loader.load_lsm_data()
-    era5_z = era5_loader.load_z_data()
-
-    return era5, era5_lsm, era5_z
-
-def load_cerra_data():
-    """
-    Loads CERRA data for the time period specified in the config file.
-    
-    Returns:
-    ---------- 
-    xr.Dataset: Xarray dataset containing temperature (t2m) data from CERRA.
-    xr.Dataset: Xarray dataset containing land surface model (LSM) data from CERRA.
-    xr.Dataset: Xarray dataset containing orographic data from CERRA.
-    """
-
-    cerra_loader = CerraDataLoader()
-
-    cerra = cerra_loader.load_t2m_data()
-    cerra_lsm = cerra_loader.load_lsm_data()
-    cerra_orog = cerra_loader.load_orog_data()
-
-    return cerra, cerra_lsm, cerra_orog
-
 
 def split_data(data, test_size=0.2):
     """
@@ -92,7 +52,7 @@ def __split(args):
     return data.sel(time=t)
 
 
-def crop_data_to_divisible(data, divisible_factor=32):
+def crop_spatial_dimension(data, divisible_factor=32):
     """
     Crops the given xarray dataset to ensure spatial dimensions (longitude and latitude) are divisible by a specified factor.
 
@@ -111,14 +71,26 @@ def crop_data_to_divisible(data, divisible_factor=32):
     ----------
     xr.Dataset: Cropped xarray dataset with spatial dimensions divisible by the specified factor.
     """
+     # Check if spatial dimensions are already divisible by the factor
+    if data.longitude.size % divisible_factor == 0 and data.latitude.size % divisible_factor == 0:
+        return data  # No cropping needed, return the original dataset
+
+
     # Calculate the new size that is divisible by the factor for both longitude and latitude
     new_longitude_size = (data.longitude.size // divisible_factor) * divisible_factor
     new_latitude_size = (data.latitude.size // divisible_factor) * divisible_factor
 
+    # Calculate the starting & ending index to achieve symmetric cropping
+    lon_start = (data.longitude.size - new_longitude_size) // 2
+    lat_start = (data.latitude.size - new_latitude_size) // 2
+
+    lon_end = lon_start + new_longitude_size
+    lat_end = lat_start + new_latitude_size
+
     # Crop the ERA5 dataset
     cropped_data = data.sel(
-        longitude=slice(data.longitude.values[0], data.longitude.values[new_longitude_size - 1]),
-        latitude=slice(data.latitude.values[0], data.latitude.values[new_latitude_size - 1])
+        longitude=slice(data.longitude.values[lon_start], data.longitude.values[lon_end - 1]),
+        latitude=slice(data.latitude.values[lat_start], data.latitude.values[lat_end - 1])
     )
 
     return cropped_data

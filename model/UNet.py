@@ -1,5 +1,4 @@
 # -------------- IMPORTS --------------
-from json import encoder
 import tensorflow as tf
 from keras.layers import (Activation, BatchNormalization, Concatenate, Conv2D,
                           Conv2DTranspose, Input, MaxPool2D, UpSampling2D)

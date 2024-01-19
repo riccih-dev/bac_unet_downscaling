@@ -1,0 +1,69 @@
+# ---------------------- ERA5 DS -----------------------
+## ERA5 - t2m 
+**Dimensions**
+(longitude: 281, latitude: 221, time: 472)
+
+**Coordinates**
+* longitude  (longitude) float32 -25.0 -24.75 -24.5 -24.25 ... 44.5 44.75 45.0
+* latitude   (latitude) float32 75.0 74.75 74.5 74.25 ... 20.5 20.25 20.0
+* time       (time) datetime64[ns] 2006-01-01 ... 2006-02-28T21:00:00
+
+**Data variables**
+t2m        (time, latitude, longitude) float32 238.9 238.9 ... 286.5 286.5
+
+
+## ERA5 - lsm and orog
+-> data only for one time point
+-> doesn't change over time! 
+
+**Dimensions**
+Dimensions:    (longitude: 281, latitude: 221, time: 1)
+
+**Coordinates**
+* longitude  (longitude) float32 -25.0 -24.75 -24.5 -24.25 ... 44.5 44.75 45.0
+* latitude   (latitude) float32 75.0 74.75 74.5 74.25 ... 20.5 20.25 20.0
+* time       (time) datetime64[ns] 2018-01-01T12:00:00
+
+**Data variables**
+lsm        (time, latitude, longitude) float32 1.0 1.0 1.0 ... 1.0 1.0 1.0
+z          (time, latitude, longitude) float32 1.797e+04 ... 7.262e+03
+
+### How do i get the data?
+era5_lsm_orog.lsm
+era5_lsm_orog.z
+
+
+
+
+
+
+# ---------------------- CERRA DS -----------------------
+## CERRA - t2m 
+**Dimensions**
+(longitude: 801, latitude: 501, time: 472)
+
+**Coordinates**
+  * longitude  (longitude) float32 -10.0 -9.95 -9.9 -9.85 ... 29.9 29.95 30.0
+  * latitude   (latitude) float32 60.0 59.95 59.9 59.85 ... 35.1 35.05 35.0
+  * time       (time) datetime64[ns] 2006-01-01 ... 2006-02-28T21:00:00
+
+**Data variables**
+t2m        (time, latitude, longitude) float32 281.4 281.4 ... 289.0 289.0
+
+
+
+## CERRA - lsm and orog
+-> data only for one time point
+-> doesn't change over time! 
+
+**Dimensions**
+Dimensions:    (longitude: 801, latitude: 501, time: 1)
+
+**Coordinates**
+ * longitude  (longitude) float32 -10.0 -9.95 -9.9 -9.85 ... 29.9 29.95 30.0
+  * latitude   (latitude) float32 60.0 59.95 59.9 59.85 ... 35.1 35.05 35.0
+  * time       (time) datetime64[ns] 2018-01-01T12:00:00
+
+**Data variables**
+    lsm        (time, latitude, longitude) float32 0.0 0.0 0.0 ... 0.0 0.0 0.0
+    orog       (time, latitude, longitude) float32 0.2687 0.3937 ... -0.1063
