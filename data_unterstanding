@@ -67,3 +67,41 @@ Dimensions:    (longitude: 801, latitude: 501, time: 1)
 **Data variables**
     lsm        (time, latitude, longitude) float32 0.0 0.0 0.0 ... 0.0 0.0 0.0
     orog       (time, latitude, longitude) float32 0.2687 0.3937 ... -0.1063
+
+
+# ------------ Geographical Area CERRA & ERA5 ------------
+By using CERRA coordinates, almost the entire Breitengrad of the globe will be used (including russia, asia and north america). Better crop it for both datasets & use the inital ERA5 
+
+## Cerra
+LONGITUDE
+min:  6.947083697372847e-05
+max:  359.9999590223182
+
+LATITUDE
+min:  20.292280999999985
+max:  75.34678492314951
+
+## ERA5
+LONGITUDE
+min:  -15.0
+max:  30.0
+LATITUDE
+min:  34.0
+max:  74.0
+
+# ---------- How to use CERRA & ERA5 xarray ----------
+### Get to know xarrays
+overview meta data info of longitude
+- cerra_ds.longitude
+- cerra_ds['longitude']
+
+get only values
+- cerra_ds.longitude.values
+
+get data of vairable for specific time
+
+- cerra_ds['t2m'].isel(time=0)) 
+    - use isel(time=0) or [0] to print for 2020-01-01 
+    - isel to get data of one dimension
+- cerra_ds['t2m'][0]
+    - same as isel 

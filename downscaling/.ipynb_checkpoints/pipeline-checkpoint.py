@@ -4,13 +4,12 @@ from data_loader.data_service import split_data, find_input_shape
 from data_loader.data_loader import DataLoader
 from preprocessor.standardized_anomalies import StandardizedAnomalies
 from preprocessor.min_max_normalization import MinMaxNormalizatiton
-from preprocessor.preprocessor import crop_spatial_dimension, crop_era5_to_cerra, pad_lr_to_match_hr, sort_ds, combine_data
+from preprocessor.preprocessor import crop_spatial_dimension, crop_era5_to_cerra, pad_lr_to_match_hr, sort_ds
 from evaluation.metrics import DownscalingMetrics
 
 import matplotlib.pyplot as plt
 import xarray as xr
 import pandas as pd
-import numpy as np 
 
 
 
@@ -123,10 +122,7 @@ class DownscalingPipeline:
         anomalies_lr_data, anomalies_hr_data = self.__normalizer.normalize_t2m(lr_data, hr_data)
         anomalies_lr_lsm_z, anomalies_hr_lsm_orog = self.__normalizer.normalize_additional_features(lr_lsm_z, hr_lsm_orog, [['lsm','lsm'], ['z', 'orog']])
 
-        combined_anomalies_lr_data = combine_data(anomalies_lr_data, anomalies_lr_lsm_z, ['lsm', 'z'])
-        combined_anomalies_hr_data = combine_data(anomalies_hr_data, anomalies_hr_lsm_orog, ['lsm', 'orog'])
-
-        return combined_anomalies_lr_data, combined_anomalies_hr_data
+        return anomalies_lr_data, anomalies_hr_data, anomalies_lr_lsm_z, anomalies_hr_lsm_orog
 
 
     

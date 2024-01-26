@@ -4,6 +4,9 @@ import io
 from config import era5_url as era5
 from config import cerra_url as cerra
 
+# TODO:
+# o remove __load_via_url_ (?)
+
 class DataLoader:  
     """
     DataLoader for loading temperature and addtional feature data from different datasets (ERA5, CERRA).

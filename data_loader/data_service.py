@@ -1,12 +1,9 @@
 
 import xarray as xr
 from sklearn.model_selection import train_test_split
+from joblib import Parallel, delayed
 
-# TODO
-# - create a better way to crop data (form each border equally)
-# - adjust splitting so it workds with correct years + test it 
-
-def split_data(data, test_size=0.2):
+def split_data(data, test_size=0.11):
     """
     Splits a given xarray dataset into training, validation, and test sets based on time.
 
@@ -52,51 +49,6 @@ def __split(args):
     return data.sel(time=t)
 
 
-def crop_spatial_dimension(data, divisible_factor=32):
-    """
-    Crops the given xarray dataset to ensure spatial dimensions (longitude and latitude) are divisible by a specified factor.
-
-    In many convolutional neural network architectures, especially those involving multiple downsampling and upsampling operations,
-    it is common to design the network such that the spatial dimensions are divisible by certain factors (e.g., 32). This ensures that
-    the dimensions can be downsampled and upsampled without resulting in fractional spatial dimensions.
-
-    Parameters:
-    -----------
-    data : xr.Dataset
-        Xarray dataset to be cropped.
-    divisible_factor : int, optional
-        The desired factor to ensure divisibility for both longitude and latitude. Default is 32.
-
-    Returns:
-    ----------
-    xr.Dataset: Cropped xarray dataset with spatial dimensions divisible by the specified factor.
-    """
-     # Check if spatial dimensions are already divisible by the factor
-    if data.longitude.size % divisible_factor == 0 and data.latitude.size % divisible_factor == 0:
-        return data  # No cropping needed, return the original dataset
-
-
-    # Calculate the new size that is divisible by the factor for both longitude and latitude
-    new_longitude_size = (data.longitude.size // divisible_factor) * divisible_factor
-    new_latitude_size = (data.latitude.size // divisible_factor) * divisible_factor
-
-    # Calculate the starting & ending index to achieve symmetric cropping
-    lon_start = (data.longitude.size - new_longitude_size) // 2
-    lat_start = (data.latitude.size - new_latitude_size) // 2
-
-    lon_end = lon_start + new_longitude_size
-    lat_end = lat_start + new_latitude_size
-
-    # Crop the ERA5 dataset
-    cropped_data = data.sel(
-        longitude=slice(data.longitude.values[lon_start], data.longitude.values[lon_end - 1]),
-        latitude=slice(data.latitude.values[lat_start], data.latitude.values[lat_end - 1])
-    )
-
-    return cropped_data
-
-
-
 def store_to_disk(file_name, data, file_path="./data/"):
     """
     Store data to disk in a specified folder.
@@ -140,7 +92,7 @@ def load_from_disk(file_name, file_path="./data/"):
 
 def find_input_shape(data):
     """
-    Determines the input shape for a given xarray dataset to be used as input for a model. The input shape is determined by the number of time steps, 
+    Determines the input shape for a given xarray dataset to be used as input for a model. The input shape is determined by the
     latitude points, longitude points, and data variables in the dataset.
 
     Parameters:
@@ -154,7 +106,7 @@ def find_input_shape(data):
     """
 
     # Extracting dimensions from the dataset
-    time_steps = len(data['time'])
+    #time_steps = len(data['time'])
     latitude_points = len(data['latitude'])
     longitude_points = len(data['longitude'])
     num_variables = len(data.data_vars)  # Assuming all data variables are used as input
@@ -162,4 +114,3 @@ def find_input_shape(data):
     # Reshaping into the input shape
     #input_shape = (time_steps, latitude_points, longitude_points, num_variables)
     return (latitude_points, longitude_points, num_variables) 
-
