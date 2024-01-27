@@ -7,7 +7,7 @@ from keras.models import Model
 class UNetModel:
     """Create and train a UNet model for downscaling."""
 
-    def create_model(self, input_shape):
+    def create_model(self, input_shape, additional_features=True):
         """
         Create the UNet model architecture.
 
@@ -34,10 +34,16 @@ class UNetModel:
         # Decoder - reconstruct HR from the learned features of Encoder
         decoder_conv = self.__decode(encoder_features=encoder_feature_maps, bridge_features=bridge_features, filters=filters, num_blocks=num_blocks)
 
-        # Output
-        outputs = Conv2D(1, (1, 1), activation='linear')(decoder_conv)
 
-        model = Model(inputs, outputs, name="downscaling_t2m_UNet")
+        if additional_features: 
+            output_temp = Conv2D(1, (1,1), activation='linear', kernel_initializer="he_normal", name="output_temp")(decoder_conv)
+            output_orog = Conv2D(1, (1, 1), activation='linear', kernel_initializer="he_normal", name="output_orog")(decoder_conv)
+            output_lsm = Conv2D(1, (1, 1), activation='linear', kernel_initializer="he_normal", name="output_lsm")(decoder_conv)
+
+            model = Model(inputs, [output_temp, output_lsm, output_orog], name="t2m_downscaling_unet_with_z")
+        else: 
+            outputs = Conv2D(1, (1, 1), activation='linear')(decoder_conv)
+            model = Model(inputs, outputs, name="downscaling_t2m_UNet")
 
         return model
     

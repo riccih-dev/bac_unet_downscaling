@@ -89,8 +89,8 @@ class MinMaxNormalizatiton:
         data_variable = data[var_name]
 
         # Calculate min and max over all data
-        xmin = np.min(data_variable)
-        xmax = np.max(data_variable)
+        xmin = float(np.min(data_variable).values)
+        xmax = float(np.max(data_variable).values)
 
         self.__variable_stats[data_name] = {'xmin': xmin, 'xmax': xmax}
 
@@ -102,6 +102,7 @@ class MinMaxNormalizatiton:
 
         return normalized_data
     
+
     def normalize_t2m_for_prediciton(self,lr_data, var_name='t2m'):
         lr_normalized = lr_data.copy()
 
@@ -116,7 +117,8 @@ class MinMaxNormalizatiton:
 
         return lr_normalized
     
-    def denormalize(self, data, var_name='t2m', data_name='lr_t2m'):
+
+    def denormalize(self, data, var_name):
         """
         Denormalize the input data for a specific variable using Min-Max denormalization.
 
@@ -132,20 +134,19 @@ class MinMaxNormalizatiton:
         xr.Dataset
             Denormalized dataset for the specified variable.
         """
+        if var_name=='orog':
+            var_name ='z'
+
+        data_name = 'lr_'+var_name 
         if data_name not in self.__variable_stats:
             raise ValueError(f"Variable {data_name} not found in variable stats. Make sure to normalize the data first.")
-
-        denormalized_data = data.copy()
-        #normalized_variable = data[var_name]
-
+    
         # Retrieve the stored min and max values
         xmin = np.array(self.__variable_stats[data_name]['xmin'])
         xmax = np.array(self.__variable_stats[data_name]['xmax'])
 
-        # Denormalize using the inverse of the Min-Max formula
-        #denormalized_data[var_name] = (data + xmin) * (xmax - xmin) 
-
         return data * (xmax - xmin) + xmin
 
-        
+
+
     

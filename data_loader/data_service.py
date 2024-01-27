@@ -106,11 +106,9 @@ def find_input_shape(data):
     """
 
     # Extracting dimensions from the dataset
-    #time_steps = len(data['time'])
     latitude_points = len(data['latitude'])
     longitude_points = len(data['longitude'])
-    num_variables = len(data.data_vars)  # Assuming all data variables are used as input
+    num_variables = len(data.data_vars)
 
     # Reshaping into the input shape
-    #input_shape = (time_steps, latitude_points, longitude_points, num_variables)
     return (latitude_points, longitude_points, num_variables) 

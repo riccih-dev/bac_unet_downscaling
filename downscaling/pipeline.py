@@ -13,11 +13,6 @@ import pandas as pd
 import numpy as np 
 
 
-
-# FIXME: 
-# - adjust predict => works correctly with pre/post processing
-# - also use lsm & z in predict?
-
 class DownscalingPipeline:
     def __init__(self, normalization_type='standardized_anomalies'):
         self.__normalization_type = normalization_type
@@ -154,7 +149,7 @@ class DownscalingPipeline:
         return lr_train_data, lr_val_data, lr_test_data, hr_train_data, hr_val_data, hr_test_data
     
 
-    def fit_model(self, X_train, y_train, X_val, y_val, loss_type='mae', num_epochs=50, batch_size=32, show_summary=False):
+    def fit_model(self, X_train, y_train, X_val, y_val, additional_features = True, loss_type='mae', num_epochs=50, batch_size=32, show_summary=False):
         """
         Fit the U-Net model with training data and validate using validation data.
 
@@ -190,25 +185,44 @@ class DownscalingPipeline:
             self.model.summary();
         
         # FIXME: ADD Learning_Rate_Schedular as callback (Irenes Model -> Notion)
+        # FIXME: ADD Optimizer as callback (Irenes Model -> Notion)
+        # FIXME: ADD Early Stopping as callback (Irenes Model -> Notion)
 
-        self.model.compile(loss=loss_type)
 
-        # Convert xarray Datasets to NumPy arrays => fit method expect numpy arrays
-        X_train_np = X_train['t2m'].values#.reshape(-1, 510, 818, 1) #before without reshape
-        y_train_np = y_train['t2m'].values#.reshape(-1, 510, 818, 1)
-        X_val_np = X_val['t2m'].values#.reshape(-1, 510, 818, 1)
-        y_val_np = y_val['t2m'].values#.reshape(-1, 510, 818, 1)
+        X_train_np = np.stack([X_train[var].values for var in X_train.data_vars], axis=-1)
+        y_train_np = np.stack([y_train[var].values for var in y_train.data_vars], axis=-1)
 
-        
-        # TODO: add lsm & z as additional informations
-        self.history = self.model.fit(
-            x=X_train_np, y=y_train_np,
-            epochs=num_epochs, batch_size=batch_size,
-            validation_data=(X_val_np, y_val_np))
+        X_val_np = np.stack([X_val[var].values for var in X_val.data_vars], axis=-1)
+        y_val_np = np.stack([y_val[var].values for var in y_val.data_vars], axis=-1)
+
+        if additional_features: 
+            output_vars = ["output_temp", "output_lsm", "output_orog"]
+            y_train_dict  = {output_vars[i]: y_train_np[:, :, :, i] for i in range(len(output_vars))}
+            y_val_dict = {output_vars[i]: y_val_np[:, :, :, i] for i in range(len(output_vars))}
+
+            loss_type_dict = {output_vars[i]: loss_type for i in range(len(output_vars))}
+            loss_weight_dict = {output_vars[i]: 1.0 for i in range(len(output_vars))}
+
+            self.model.compile(loss=loss_type_dict, loss_weights=loss_weight_dict)
+                               
+
+            self.history = self.model.fit(
+                x=X_train_np,
+                y=y_train_dict,
+                epochs=num_epochs, batch_size=batch_size,
+                validation_data=(X_val_np, y_val_dict))
+
+        else:
+            self.model.compile(loss=loss_type)
+
+            self.history = self.model.fit(
+                x=X_train_np, y=y_train_np,
+                epochs=num_epochs, batch_size=batch_size,
+                validation_data=(X_val_np, y_val_np))
 
         return self.model 
         
-    def predict(self, lr_data):
+    def predict(self, lr_data, additional_features=True):
         '''
         downscales low-resolution temperature data using trained UNet model
 
@@ -225,17 +239,54 @@ class DownscalingPipeline:
         #data_standardized = self.__normalizer.normalize_t2m_for_prediciton(lr_data)
         #data_standardized = data_standardized['t2m']
         
-        t2m_data = lr_data['t2m']
+        #t2m_data = lr_data['t2m']
 
         # peforms prediction using trained U-Net model
-        predicted_anomalies = self.model.predict(t2m_data)
+        #predicted_anomalies = self.model.predict(t2m_data)
+
+        data = np.stack([lr_data[var].values for var in lr_data.data_vars], axis=-1)
+
+        predictions = self.model.predict(data)
+        predicted_data = self.predictions_to_xarray(lr_data, predictions)
         
-        # post-processing by inversing the standardization
-        return self.__normalizer.denormalize(predicted_anomalies)
+        return self.denormalize(predicted_data)
     
+
+    def predictions_to_xarray(self,input_data, predicted_data):
+        coords = {
+            'longitude': input_data['longitude'],
+            'latitude': input_data['latitude'],
+            'time': input_data['time']
+        }
+
+        # Create a new xarray.Dataset with the predicted data
+        predicted_dataset = xr.Dataset()
+
+        for i, variable_name in enumerate(['t2m', 'lsm', 'orog']):  # Assuming these are your variable names
+            # Access the i-th element in the predicted_variable list
+            predicted_data_i = predicted_data[i]
+
+            # Extract the predicted values (assuming they are in the last dimension)
+            predicted_values_i = np.squeeze(predicted_data_i, axis=-1)
+
+            # Add a new variable to the predicted_dataset
+            predicted_dataset[variable_name] = (['time', 'latitude', 'longitude'], predicted_values_i)
+
+        # Assign coordinates
+        predicted_dataset = predicted_dataset.assign_coords(coords)
+
+        return predicted_dataset
     
-    def denormalize(self, data):
-        return self.__normalizer.denormalize(data)
+
+    def denormalize(self, data, additional_features=True):
+        denormalized_data = data.copy()
+        if additional_features: 
+            denormalized_data['lsm']= self.__normalizer.denormalize(data['lsm'], 'lsm')
+            denormalized_data['orog']= self.__normalizer.denormalize(data['orog'], 'orog') 
+
+        denormalized_data['t2m'] = self.__normalizer.denormalize(data['t2m'], 't2m')
+        
+        return denormalized_data
 
     # FIXME: put into visualization
     def show_training_history(self):

@@ -57,12 +57,6 @@ def pad_lr_to_match_hr(hr_data, lr_data):
     # Reindex the low-resolution data to match the dimensions of high-resolution data
     lr_data_reindexed = lr_data.reindex(latitude=hr_data['latitude'], longitude=hr_data['longitude'])
 
-    # Fill NaN values in the padded low-resolution data with the corresponding values from the original low-resolution data
-    #for var_name in lr_data.data_vars:
-    #    lr_data_reindexed[var_name] = lr_data_reindexed[var_name].combine_first(lr_data[var_name])
-
-
-    #values_interp = lr_data_reindexed.sortby('latitude')
     values_interp_long = lr_data_reindexed.interpolate_na(dim='longitude', method = 'linear', fill_value="extrapolate")
     values_interp_lat = values_interp_long.interpolate_na(dim='latitude', method = 'linear', fill_value="extrapolate") # epxloration needed as some latitude dim constist only of nan
     
