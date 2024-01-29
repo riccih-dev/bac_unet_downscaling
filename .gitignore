@@ -7,4 +7,4 @@ data/
 # Ignore .vscode folder
 .vscode/
 
-.results/
+results

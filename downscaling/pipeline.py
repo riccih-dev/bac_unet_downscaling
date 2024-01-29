@@ -1,16 +1,21 @@
 
 from model.unet import UNetModel
-from data_loader.data_service import split_data, find_input_shape
+from model.modelconfig import UNetModelConfiguration
 from data_loader.data_loader import DataLoader
 from preprocessor.standardized_anomalies import StandardizedAnomalies
 from preprocessor.min_max_normalization import MinMaxNormalizatiton
-from preprocessor.preprocessor import crop_spatial_dimension, crop_era5_to_cerra, pad_lr_to_match_hr, sort_ds, combine_data
+from preprocessor.preprocessor import crop_spatial_dimension, crop_era5_to_cerra, pad_lr_to_match_hr, sort_ds, combine_data, extract_t2m_at_specific_times
 from evaluation.metrics import DownscalingMetrics
+from visualization.evaluation_visualizer import EvaluationVisualization
+from utility.utility import predictions_to_xarray_additional_features, predictions_to_xarray_t2m, prepare_data_for_model_fit, split_data, find_input_shape
 
 import matplotlib.pyplot as plt
 import xarray as xr
 import pandas as pd
 import numpy as np 
+import tensorflow as tf
+import tabulate
+
 
 
 class DownscalingPipeline:
@@ -74,7 +79,8 @@ class DownscalingPipeline:
         era5, era5_lsm_orog = data_loader.load_era5_data()
 
         return era5, era5_lsm_orog
-    
+
+
     def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, reset_climatology_stats = True):
         '''
         Performs pre-processing step by cropping spatial dimension, 
@@ -102,6 +108,8 @@ class DownscalingPipeline:
 
         lr_data, lr_lsm_z = sort_ds(lr_data), sort_ds(lr_lsm_z)
         hr_data, hr_lsm_orog = sort_ds(hr_data), sort_ds(hr_lsm_orog)
+
+        lr_data, hr_data = extract_t2m_at_specific_times(lr_data), extract_t2m_at_specific_times(hr_data)
     
         # CROP ERA5 to match spatial area of CERRA DS
         lr_data, lr_lsm_z = crop_era5_to_cerra(lr_data, lr_lsm_z, hr_data)
@@ -119,12 +127,10 @@ class DownscalingPipeline:
         anomalies_lr_lsm_z, anomalies_hr_lsm_orog = self.__normalizer.normalize_additional_features(lr_lsm_z, hr_lsm_orog, [['lsm','lsm'], ['z', 'orog']])
 
         combined_anomalies_lr_data = combine_data(anomalies_lr_data, anomalies_lr_lsm_z, ['lsm', 'z'])
-        combined_anomalies_hr_data = combine_data(anomalies_hr_data, anomalies_hr_lsm_orog, ['lsm', 'orog'])
+        #combined_anomalies_hr_data = combine_data(anomalies_hr_data, anomalies_hr_lsm_orog, ['lsm', 'orog'])
 
-        return combined_anomalies_lr_data, combined_anomalies_hr_data
+        return combined_anomalies_lr_data, anomalies_hr_data
 
-
-    
 
     def split_data(self, lr_data, hr_data):
         """
@@ -149,7 +155,7 @@ class DownscalingPipeline:
         return lr_train_data, lr_val_data, lr_test_data, hr_train_data, hr_val_data, hr_test_data
     
 
-    def fit_model(self, X_train, y_train, X_val, y_val, additional_features = True, loss_type='mae', num_epochs=50, batch_size=32, show_summary=False):
+    def fit_model(self, X_train, y_train, X_val, y_val, scheduler_type, learning_rate_value, filters, additional_features = False, loss_type='mae', num_epochs=50, batch_size=32, show_summary=False):
         """
         Fit the U-Net model with training data and validate using validation data.
 
@@ -177,52 +183,47 @@ class DownscalingPipeline:
         keras.models.Model
             Compiled and trained U-Net model.
         """
+        # Create U-Net model
         model_service = UNetModel()
         input_shape = find_input_shape(X_train)
-        self.model = model_service.create_model(input_shape)
+        self.model = model_service.create_model(input_shape, filters)
         
         if(show_summary):
             self.model.summary();
         
-        # FIXME: ADD Learning_Rate_Schedular as callback (Irenes Model -> Notion)
-        # FIXME: ADD Optimizer as callback (Irenes Model -> Notion)
-        # FIXME: ADD Early Stopping as callback (Irenes Model -> Notion)
+        # Configure model parameters
+        model_config = UNetModelConfiguration()
+        callback = model_config.configure_callbacks(scheduler_type)
+        optimizer = model_config.configure_optimizer(learning_rate_value)
 
+        # Prepare data for model fitting
+        X_train_np = prepare_data_for_model_fit(X_train)
+        y_train_np = prepare_data_for_model_fit(y_train)
+        X_val_np = prepare_data_for_model_fit(X_val)
+        y_val_np = prepare_data_for_model_fit(y_val)
 
-        X_train_np = np.stack([X_train[var].values for var in X_train.data_vars], axis=-1)
-        y_train_np = np.stack([y_train[var].values for var in y_train.data_vars], axis=-1)
-
-        X_val_np = np.stack([X_val[var].values for var in X_val.data_vars], axis=-1)
-        y_val_np = np.stack([y_val[var].values for var in y_val.data_vars], axis=-1)
-
+        # Handle additional features to predict
         if additional_features: 
             output_vars = ["output_temp", "output_lsm", "output_orog"]
-            y_train_dict  = {output_vars[i]: y_train_np[:, :, :, i] for i in range(len(output_vars))}
-            y_val_dict = {output_vars[i]: y_val_np[:, :, :, i] for i in range(len(output_vars))}
+            y_train_np  = {output_vars[i]: y_train_np[:, :, :, i] for i in range(len(output_vars))}
+            y_val_np = {output_vars[i]: y_val_np[:, :, :, i] for i in range(len(output_vars))}
 
-            loss_type_dict = {output_vars[i]: loss_type for i in range(len(output_vars))}
-            loss_weight_dict = {output_vars[i]: 1.0 for i in range(len(output_vars))}
+            loss_type = {output_vars[i]: loss_type for i in range(len(output_vars))}
+            #loss_weight = {output_vars[i]: 1.0 for i in range(len(output_vars))}
 
-            self.model.compile(loss=loss_type_dict, loss_weights=loss_weight_dict)
-                               
+        # Compile and fit the model
+        self.model.compile(optimizer=optimizer, loss=loss_type)
 
-            self.history = self.model.fit(
-                x=X_train_np,
-                y=y_train_dict,
-                epochs=num_epochs, batch_size=batch_size,
-                validation_data=(X_val_np, y_val_dict))
-
-        else:
-            self.model.compile(loss=loss_type)
-
-            self.history = self.model.fit(
-                x=X_train_np, y=y_train_np,
-                epochs=num_epochs, batch_size=batch_size,
-                validation_data=(X_val_np, y_val_np))
+        self.history = self.model.fit(
+                    x=X_train_np, y=y_train_np,
+                    epochs=num_epochs, batch_size=batch_size,
+                    callbacks=[callback],
+                    validation_data=(X_val_np, y_val_np))    
 
         return self.model 
+     
         
-    def predict(self, lr_data, additional_features=True):
+    def predict(self, lr_data, additional_features=False):
         '''
         downscales low-resolution temperature data using trained UNet model
 
@@ -235,50 +236,38 @@ class DownscalingPipeline:
         prediced downscaled temperature
 
         '''        
-        # Standardize new low-resolution data # NOO NEED, already preprocessed 
-        #data_standardized = self.__normalizer.normalize_t2m_for_prediciton(lr_data)
-        #data_standardized = data_standardized['t2m']
-        
-        #t2m_data = lr_data['t2m']
-
-        # peforms prediction using trained U-Net model
-        #predicted_anomalies = self.model.predict(t2m_data)
-
         data = np.stack([lr_data[var].values for var in lr_data.data_vars], axis=-1)
 
-        predictions = self.model.predict(data)
-        predicted_data = self.predictions_to_xarray(lr_data, predictions)
-        
-        return self.denormalize(predicted_data)
+        predictions_normalized = self.model.predict(data)
+
+        if additional_features:
+            prediction_norm_array= predictions_to_xarray_additional_features(lr_data, predictions_normalized, ['t2m', 'lsm', 'orog'])
+            return  self.denormalize(prediction_norm_array, True)
+        else:
+            prediction_norm_array = predictions_to_xarray_t2m(lr_data, predictions_normalized)
+            return self.denormalize(prediction_norm_array)
     
 
-    def predictions_to_xarray(self,input_data, predicted_data):
-        coords = {
-            'longitude': input_data['longitude'],
-            'latitude': input_data['latitude'],
-            'time': input_data['time']
-        }
+    def denormalize(self, data, additional_features=False):
+        """
+        Denormalize the normalized input data.
 
-        # Create a new xarray.Dataset with the predicted data
-        predicted_dataset = xr.Dataset()
+        Parameters:
+        -----------
+        data : xarray.Dataset
+            Normalized input data containing variables to be denormalized.
+        additional_features : bool, optional
+            Whether additional features like 'lsm' and 'orog' are present in the data (default is False).
 
-        for i, variable_name in enumerate(['t2m', 'lsm', 'orog']):  # Assuming these are your variable names
-            # Access the i-th element in the predicted_variable list
-            predicted_data_i = predicted_data[i]
+        Returns:
+        --------
+        xarray.Dataset
+            Denormalized dataset containing the original data values.
 
-            # Extract the predicted values (assuming they are in the last dimension)
-            predicted_values_i = np.squeeze(predicted_data_i, axis=-1)
-
-            # Add a new variable to the predicted_dataset
-            predicted_dataset[variable_name] = (['time', 'latitude', 'longitude'], predicted_values_i)
-
-        # Assign coordinates
-        predicted_dataset = predicted_dataset.assign_coords(coords)
-
-        return predicted_dataset
-    
-
-    def denormalize(self, data, additional_features=True):
+        Note:
+        -----
+        If `additional_features` is True, 'lsm' and 'orog' variables will be denormalized in addition to 't2m'.
+        """
         denormalized_data = data.copy()
         if additional_features: 
             denormalized_data['lsm']= self.__normalizer.denormalize(data['lsm'], 'lsm')
@@ -288,53 +277,25 @@ class DownscalingPipeline:
         
         return denormalized_data
 
-    # FIXME: put into visualization
-    def show_training_history(self):
+
+    def show_training_history(self, filename_suffix, show_graph=True):
         """
-        Display plots of training and validation loss over epochs.
+        Display a plot of training and validation loss over epochs.
         """
-        # Obtain information from the history object
-        training_loss = self.history.history['loss']
-        validation_loss = self.history.history['val_loss']
-
-        # Plot the training history with two plots side by side
-        plt.figure(figsize=(12, 5))
-
-        # Plot training loss
-        plt.subplot(1, 2, 1)
-        plt.plot(training_loss, label='Training Loss')
-        plt.title('Training Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-
-        # Plot validation loss
-        plt.subplot(1, 2, 2)
-        plt.plot(validation_loss, label='Validation Loss')
-        plt.title('Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-
-        # Show the plots
-        plt.tight_layout()
-        plt.show()
+        visualizer = EvaluationVisualization()
+        visualizer.show_training_history(self.history.history, filename_suffix, show_graph)
+        
         
     def evaluate_prediction(self, y_true, y_pred):
         """Calculate and visualize all metrics"""
-        metric = DownscalingMetrics(y_true['t2m'].values, y_pred)
-        
-        rmse = metric.calculate_rmse()
-        mae = metric.calculate_mae()
-        max_error = metric.calculate_max_error()
-        bias = metric.calculate_bias()#
-        
-        metrics_dict = {
-            'RMSE': [rmse],
-            'MAE': [mae],
-            'Max Error': [max_error],
-            'Bias': [bias]
-        }
+        metric = DownscalingMetrics(y_true['t2m'].values, y_pred['t2m'].values)
 
-        metrics_df = pd.DataFrame(metrics_dict)
-        print(metrics_df)
+        metric_results = metric.calculate_metrics()
+
+        print("\nMetrics:")
+        print(tabulate.tabulate(metric_results, headers='keys', tablefmt="fancy_grid"))
+
+        return metric_results
+
+    def get_history(self):
+        return self.history.history

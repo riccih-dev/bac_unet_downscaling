@@ -1,3 +1,6 @@
+import xarray as xr
+import pandas as pd
+
 '''
 Utility functions for Preprocessing-Step
 '''
@@ -131,5 +134,39 @@ def combine_data(data, additional_features, var_names):
     combined_data = data.assign(**additional_vars)
 
     return combined_data
+
+
+def extract_t2m_at_specific_times(data, specific_times = ['00:00', '06:00', '12:00', '18:00']):
+    """
+    Extracts the 't2m' data from the ERA5 dataset at specific times, per default (00:00, 06:00, 12:00, 18:00).
+
+    Parameters:
+    - data (xarray.Dataset): dataset containing 't2m' variable.
+
+    Returns:
+    - t2m_at_specific_times (xarray.DataArray): Extracted 't2m' data at specific times.
+    """
+    # Extract the time values
+    times = data['time'].values
+
+    # Extract indices of the specific times
+    time_indices = [i for i, t in enumerate(times) if pd.to_datetime(t).strftime('%H:%M') in specific_times]
+
+    # Extract t2m data at specific times
+    t2m_at_specific_times = data['t2m'].isel(time=time_indices)
+
+    # Create a new dataset with the same structure as the original dataset
+    extracted_data = xr.Dataset({
+        't2m': (['time', 'latitude', 'longitude'], t2m_at_specific_times.values)
+    },
+        coords={
+            'longitude': data['longitude'],
+            'latitude': data['latitude'],
+            'time': data['time'].isel(time=time_indices)
+        },
+        attrs={'units': 'K', 'long_name': '2 metre temperature'}
+    )
+
+    return extracted_data
 
 

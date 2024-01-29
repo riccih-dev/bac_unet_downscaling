@@ -4,9 +4,6 @@ import io
 from config import era5_url as era5
 from config import cerra_url as cerra
 
-# TODO:
-# o remove __load_via_url_ (?)
-
 class DataLoader:  
     """
     DataLoader for loading temperature and addtional feature data from different datasets (ERA5, CERRA).
@@ -19,25 +16,6 @@ class DataLoader:
         self.__cerra_t2m_paths = cerra.t2m_urls_small_set
         self.__cerra_lsm_orog_path = cerra.lsm_orog_url
 
-
-    def __load_via_url_(self, urls):
-        """
-        Loads datasets from a list of URLs and concatenates them along the 'time' dimension.
-
-        Args:
-            urls (list): List of URLs pointing to dataset files.
-
-        Returns:
-            xr.Dataset: Xarray dataset containing concatenated data.
-        """
-        
-        return xr.concat(
-            [
-                xr.open_dataset(io.BytesIO(requests.get(url, allow_redirects=True).content), engine='h5netcdf')
-                for url in urls
-            ],
-            dim='time'
-        )
     
     def __load_via_url(self, urls):
         """

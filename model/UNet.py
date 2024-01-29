@@ -1,13 +1,14 @@
 # -------------- IMPORTS --------------
 import tensorflow as tf
 from keras.layers import (Activation, BatchNormalization, Concatenate, Conv2D,
-                          Conv2DTranspose, Input, MaxPool2D, UpSampling2D)
+                          Conv2DTranspose, Input, MaxPool2D)
 from keras.models import Model
+from keras.regularizers import l2
 
 class UNetModel:
     """Create and train a UNet model for downscaling."""
 
-    def create_model(self, input_shape, additional_features=True):
+    def create_model(self, input_shape, filters, additional_features=False):
         """
         Create the UNet model architecture.
 
@@ -20,7 +21,6 @@ class UNetModel:
         - Keras Model: The UNet model for downscaling temperature.
         """
         num_blocks = 4
-        filters = [56, 112, 224, 448, 896]
 
         #input tensor to the entire U-Net model.
         inputs = Input(input_shape)
@@ -36,13 +36,13 @@ class UNetModel:
 
 
         if additional_features: 
-            output_temp = Conv2D(1, (1,1), activation='linear', kernel_initializer="he_normal", name="output_temp")(decoder_conv)
-            output_orog = Conv2D(1, (1, 1), activation='linear', kernel_initializer="he_normal", name="output_orog")(decoder_conv)
-            output_lsm = Conv2D(1, (1, 1), activation='linear', kernel_initializer="he_normal", name="output_lsm")(decoder_conv)
+            output_temp = Conv2D(1, (1,1), activation='tanh', kernel_initializer="he_normal", name="output_temp")(decoder_conv)
+            output_orog = Conv2D(1, (1, 1), activation='tanh', kernel_initializer="he_normal", name="output_orog")(decoder_conv)
+            output_lsm = Conv2D(1, (1, 1), activation='tanh', kernel_initializer="he_normal", name="output_lsm")(decoder_conv)
 
             model = Model(inputs, [output_temp, output_lsm, output_orog], name="t2m_downscaling_unet_with_z")
         else: 
-            outputs = Conv2D(1, (1, 1), activation='linear')(decoder_conv)
+            outputs = Conv2D(1, (1, 1), activation='tanh')(decoder_conv)
             model = Model(inputs, outputs, name="downscaling_t2m_UNet")
 
         return model
@@ -112,7 +112,7 @@ class UNetModel:
 
         for i in range(num_blocks): 
             # Upsampling or Transpose Convolution - increases the spatial resolution of the feature maps 
-            deconv = Conv2DTranspose(filters[i+1], kernel_size = kernel_size , strides = (2,2), padding = padding)(bridge_features)        
+            deconv = Conv2DTranspose(filters[i+1], kernel_size = kernel_size , strides = (2,2), padding = padding)(bridge_features)      
             
             # Skip Connections - conncets correpsonding encoder and decoder layer - to obtain spatial information
             conv = Concatenate(axis=3)([deconv, encoder_features[i]])
@@ -130,8 +130,8 @@ class UNetModel:
 
     
 
-    def __conv_block(self, conv, num_filters: int, kernel_size: tuple = (3, 3), activation: str = 'relu', padding: str = 'same',
-                       kernel_initializer: str = 'he_normal', use_batch_normalization: bool = True):
+    def __conv_block(self, conv, num_filters: int, kernel_size: tuple = (3, 3), activation: str = 'tanh', padding: str = 'same',
+                       kernel_initializer: str = 'he_normal', reg_val = 0.00000001, use_batch_normalization: bool = True):
         """
         Convolutional block with optional batch normalization.
 
@@ -149,7 +149,9 @@ class UNetModel:
         ----------
         - Keras Tensor: The tensor after convolution, batch normalization, and activation.
         """
-        conv = Conv2D(num_filters, kernel_size, padding=padding,kernel_initializer=kernel_initializer)(conv)
+        conv = Conv2D(num_filters, kernel_size, padding=padding,kernel_initializer=kernel_initializer, 
+                      #kernel_regularizer=l2(reg_val), bias_regularizer=l2(reg_val)
+                      )(conv)
 
         # Optionally apply batch normalization
         if use_batch_normalization:
