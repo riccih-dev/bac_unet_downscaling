@@ -80,7 +80,7 @@ class DownscalingPipeline:
         return era5, era5_lsm_orog
 
 
-    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, stats_filename='', crop_region = [],reset_climatology_stats = True):
+    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, stats_filename='', crop_region = None, reset_climatology_stats = True):
         '''
         Performs pre-processing step by cropping spatial dimension, 
         and normalizes additional variables using standardized anomalies or min-max normalization.
@@ -112,25 +112,11 @@ class DownscalingPipeline:
     
         # CROP ERA5 to match spatial area of CERRA DS
         # TODO: this step is needed ?
-        lr_data, lr_lsm_z = crop_era5_to_cerra(lr_data, lr_lsm_z, hr_data)
- 
-        # move to preprocessor
-        if crop_region is not None:
-            min_lon, min_lat, max_lon, max_lat = crop_region
-
-            hr_data = hr_data.isel(
-                longitude=slice(min_lon, max_lon),
-                latitude=slice(min_lat, max_lat)
-            )
-
-            hr_lsm_orog = hr_lsm_orog.isel(
-                longitude=slice(min_lon, max_lon),
-                latitude=slice(min_lat, max_lat)
-            )
+        #lr_data, lr_lsm_z = crop_era5_to_cerra(lr_data, lr_lsm_z, hr_data)
 
         # Crop spatial dimensions to ensure divisibility for neural network operations
-        hr_data = crop_spatial_dimension(hr_data)
-        hr_lsm_orog = crop_spatial_dimension(hr_lsm_orog)
+        hr_data = crop_spatial_dimension(hr_data, crop_region)
+        hr_lsm_orog = crop_spatial_dimension(hr_lsm_orog, crop_region)
 
         # Pad era5 data to match the dimensions of cerra using interpolation
         lr_data = pad_lr_to_match_hr(hr_data, lr_data)

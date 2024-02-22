@@ -1,6 +1,7 @@
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np 
-import json
+import xarray as xr
+import pickle
 
 
 class MinMaxNormalizatiton:    
@@ -10,18 +11,18 @@ class MinMaxNormalizatiton:
 
     def store_stats_to_disk(self, filename):
         """
-        Store variable statistics to disk using JSON format.
+        Store variable statistics to disk using pickle.
         """
-        with open(filename, 'w') as file:
-            json.dump(self.__variable_stats, file)
+        with open(filename, 'wb') as file:
+            pickle.dump(self.__variable_stats, file)
 
     def load_stats_from_disk(self, filename):
         """
-        Load variable statistics from disk using JSON format.
+        Load variable statistics from disk using pickle.
         """
         try:
-            with open(filename, 'r') as file:
-                self.__variable_stats = json.load(file)
+            with open(filename, 'rb') as file:
+                self.__variable_stats = pickle.load(file)
         except FileNotFoundError:
             print(f"File '{filename}' not found. No stats loaded.")
 

@@ -5,9 +5,9 @@ import pandas as pd
 Utility functions for Preprocessing-Step
 '''
 
-def crop_spatial_dimension(data, divisible_factor=2):
+def crop_spatial_dimension(data, crop_region=None, divisible_factor=2):
     """
-    Crops the given xarray dataset to ensure spatial dimensions (longitude and latitude) are divisible by a specified factor.
+    Crops the given xarray dataset based on a specified region and ensures spatial dimensions are divisible by a specified factor.
 
     In many convolutional neural network architectures, especially those involving multiple downsampling and upsampling operations,
     it is common to design the network such that the spatial dimensions are divisible by certain factors (e.g., 32). This ensures that
@@ -16,34 +16,46 @@ def crop_spatial_dimension(data, divisible_factor=2):
     Parameters:
     -----------
     data : xr.Dataset
-        Xarray dataset to be cropped.
+        Xarray dataset to be cropped and adjusted.
+    crop_region : tuple or None, optional
+        A tuple (min_lon, min_lat, max_lon, max_lat) specifying the region to crop the dataset to. If set to None, no initial cropping is performed.
+        Default is None.
     divisible_factor : int, optional
         The desired factor to ensure divisibility for both longitude and latitude. Default is 32.
 
     Returns:
     ----------
-    xr.Dataset: Cropped xarray dataset with spatial dimensions divisible by the specified factor.
+    xr.Dataset: Cropped and adjusted xarray dataset with spatial dimensions divisible by the specified factor.
+    
     """
-     # Check if spatial dimensions are already divisible by the factor
-    if data.longitude.size % divisible_factor == 0 and data.latitude.size % divisible_factor == 0:
-        return data  # No cropping needed, return the original dataset
+    # Crop based on specified region if provided
+    if crop_region is not None:
+        hr_data = data.sel(
+            longitude=slice(crop_region[0], crop_region[2]),
+            latitude=slice(crop_region[1], crop_region[3])
+        )
+    else:
+        hr_data = data.copy()  # If no crop region is specified, use the entire dataset
 
+    # Check if spatial dimensions are already divisible by the factor
+    if hr_data.longitude.size % divisible_factor == 0 and hr_data.latitude.size % divisible_factor == 0:
+        return hr_data  # No further cropping needed, return the cropped dataset
 
     # Calculate the new size that is divisible by the factor for both longitude and latitude
-    new_longitude_size = (data.longitude.size // divisible_factor) * divisible_factor
-    new_latitude_size = (data.latitude.size // divisible_factor) * divisible_factor
+    new_longitude_size = (hr_data.longitude.size // divisible_factor) * divisible_factor
+    new_latitude_size = (hr_data.latitude.size // divisible_factor) * divisible_factor
 
     # Calculate the starting & ending index to achieve symmetric cropping
-    lon_start = (data.longitude.size - new_longitude_size) // 2
-    lat_start = (data.latitude.size - new_latitude_size) // 2
+    lon_start = (hr_data.longitude.size - new_longitude_size) // 2
+    lat_start = (hr_data.latitude.size - new_latitude_size) // 2
 
     lon_end = lon_start + new_longitude_size
     lat_end = lat_start + new_latitude_size
 
-    # Crop the ERA5 dataset
-    cropped_data = data.sel(
-        longitude=slice(data.longitude.values[lon_start], data.longitude.values[lon_end - 1]),
-        latitude=slice(data.latitude.values[lat_start], data.latitude.values[lat_end - 1])
+    # Crop the hr_data dataset for spatial dimensions divisibility
+    cropped_data = hr_data.sel(
+        longitude=slice(hr_data.longitude.values[lon_start], hr_data.longitude.values[lon_end - 1]),
+        latitude=slice(hr_data.latitude.values[lat_start], hr_data.latitude.values[lat_end - 1])
     )
 
     return cropped_data
