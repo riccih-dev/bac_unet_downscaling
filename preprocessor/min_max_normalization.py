@@ -1,11 +1,29 @@
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np 
+import json
 
 
 class MinMaxNormalizatiton:    
     """Calculate standardized anomalies for input data."""
     def __init__(self):
         self.__variable_stats = {}
+
+    def store_stats_to_disk(self, filename):
+        """
+        Store variable statistics to disk using JSON format.
+        """
+        with open(filename, 'w') as file:
+            json.dump(self.__variable_stats, file)
+
+    def load_stats_from_disk(self, filename):
+        """
+        Load variable statistics from disk using JSON format.
+        """
+        try:
+            with open(filename, 'r') as file:
+                self.__variable_stats = json.load(file)
+        except FileNotFoundError:
+            print(f"File '{filename}' not found. No stats loaded.")
 
 
     def normalize_t2m(self, lr_data, hr_data):

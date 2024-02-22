@@ -4,9 +4,9 @@ lsm_geop_url = [
 
 t2m_url_small_set = [
     'http://rheissenberger.com/bac/era5/t2m_era5_200605_025deg.nc',
-    #'http://rheissenberger.com/bac/era5/t2m_era5_200606_025deg.nc',
-    #'http://rheissenberger.com/bac/era5/t2m_era5_200705_025deg.nc',
-    #'http://rheissenberger.com/bac/era5/t2m_era5_200706_025deg.nc',
+    'http://rheissenberger.com/bac/era5/t2m_era5_200606_025deg.nc',
+    'http://rheissenberger.com/bac/era5/t2m_era5_200705_025deg.nc',
+    'http://rheissenberger.com/bac/era5/t2m_era5_200706_025deg.nc',
 
     #'http://rheissenberger.com/bac/era5/t2m_era5_200805_025deg.nc',
     #'http://rheissenberger.com/bac/era5/t2m_era5_200806_025deg.nc',

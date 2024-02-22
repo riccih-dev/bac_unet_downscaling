@@ -4,9 +4,9 @@ lsm_orog_url = [
 
 t2m_urls_small_set = [
     'http://rheissenberger.com/bac/cerra/t2m_cerra_200605_005deg.nc',
-    #'http://rheissenberger.com/bac/cerra/t2m_cerra_200606_005deg.nc',
-    #'http://rheissenberger.com/bac/cerra/t2m_cerra_200705_005deg.nc',
-    #'http://rheissenberger.com/bac/cerra/t2m_cerra_200706_005deg.nc',
+    'http://rheissenberger.com/bac/cerra/t2m_cerra_200606_005deg.nc',
+    'http://rheissenberger.com/bac/cerra/t2m_cerra_200705_005deg.nc',
+    'http://rheissenberger.com/bac/cerra/t2m_cerra_200706_005deg.nc',
 
 #    'http://rheissenberger.com/bac/cerra/t2m_cerra_200805_005deg.nc',
  #   'http://rheissenberger.com/bac/cerra/t2m_cerra_200806_005deg.nc',

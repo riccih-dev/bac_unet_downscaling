@@ -17,8 +17,7 @@ import tensorflow as tf
 import tabulate
 
 
-
-class DownscalingPipeline:
+class DownscalingPipeline: 
     def __init__(self, normalization_type='standardized_anomalies'):
         self.__normalization_type = normalization_type
         """
@@ -81,7 +80,7 @@ class DownscalingPipeline:
         return era5, era5_lsm_orog
 
 
-    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, reset_climatology_stats = True):
+    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, stats_filename='', crop_region = [],reset_climatology_stats = True):
         '''
         Performs pre-processing step by cropping spatial dimension, 
         and normalizes additional variables using standardized anomalies or min-max normalization.
@@ -112,8 +111,23 @@ class DownscalingPipeline:
         lr_data, hr_data = extract_t2m_at_specific_times(lr_data), extract_t2m_at_specific_times(hr_data)
     
         # CROP ERA5 to match spatial area of CERRA DS
+        # TODO: this step is needed ?
         lr_data, lr_lsm_z = crop_era5_to_cerra(lr_data, lr_lsm_z, hr_data)
  
+        # move to preprocessor
+        if crop_region is not None:
+            min_lon, min_lat, max_lon, max_lat = crop_region
+
+            hr_data = hr_data.isel(
+                longitude=slice(min_lon, max_lon),
+                latitude=slice(min_lat, max_lat)
+            )
+
+            hr_lsm_orog = hr_lsm_orog.isel(
+                longitude=slice(min_lon, max_lon),
+                latitude=slice(min_lat, max_lat)
+            )
+
         # Crop spatial dimensions to ensure divisibility for neural network operations
         hr_data = crop_spatial_dimension(hr_data)
         hr_lsm_orog = crop_spatial_dimension(hr_lsm_orog)
@@ -125,6 +139,8 @@ class DownscalingPipeline:
         # Normalize based on normalizer_type defined in constructor
         anomalies_lr_data, anomalies_hr_data = self.__normalizer.normalize_t2m(lr_data, hr_data)
         anomalies_lr_lsm_z, anomalies_hr_lsm_orog = self.__normalizer.normalize_additional_features(lr_lsm_z, hr_lsm_orog, [['lsm','lsm'], ['z', 'orog']])
+
+        self.__normalizer.store_stats_to_disk(stats_filename)
 
         combined_anomalies_lr_data = combine_data(anomalies_lr_data, anomalies_lr_lsm_z, ['lsm', 'z'])
         #combined_anomalies_hr_data = combine_data(anomalies_hr_data, anomalies_hr_lsm_orog, ['lsm', 'orog'])
@@ -155,26 +171,20 @@ class DownscalingPipeline:
         return lr_train_data, lr_val_data, lr_test_data, hr_train_data, hr_val_data, hr_test_data
     
 
-    def fit_model(self, X_train, y_train, X_val, y_val, scheduler_type, learning_rate_value, filters, additional_features = False, loss_type='mae', num_epochs=50, batch_size=32, show_summary=False):
+    def fit_model(self, train_generator, val_generator, scheduler_type, learning_rate_value, filters, loss_type='mae', num_epochs=50, batch_size=32, show_summary=False):
         """
-        Fit the U-Net model with training data and validate using validation data.
+        Fit the U-Net model with training data generator and validate using validation data generator.
 
         Parameters:
         -----------
-        X_train : xarray.Dataset
-            Training input data with variables, dimensions, and coordinates.
-        y_train : xarray.Dataset
-            Training target data with variables, dimensions, and coordinates.
-        X_val : xarray.Dataset
-            Validation input data with variables, dimensions, and coordinates.
-        y_val : xarray.Dataset
-            Validation target data with variables, dimensions, and coordinates.
+        train_generator : DataGenerator
+            Training data generator.
+        val_generator : DataGenerator
+            Validation data generator.
         loss_type : str, optional
             Type of loss function to be used during model compilation (default is 'mae').
         num_epochs : int, optional
             Number of training epochs (default is 50).
-        batch_size : int, optional
-            Batch size for training (default is 32).
         show_summary : bool, optional
             Whether to print the model summary (default is False).
 
@@ -185,7 +195,7 @@ class DownscalingPipeline:
         """
         # Create U-Net model
         model_service = UNetModel()
-        input_shape = find_input_shape(X_train)
+        input_shape = find_input_shape(train_generator.data)
         self.model = model_service.create_model(input_shape, filters)
         
         if(show_summary):
@@ -196,30 +206,18 @@ class DownscalingPipeline:
         callback = model_config.configure_callbacks(scheduler_type)
         optimizer = model_config.configure_optimizer(learning_rate_value)
 
-        # Prepare data for model fitting
-        X_train_np = prepare_data_for_model_fit(X_train)
-        y_train_np = prepare_data_for_model_fit(y_train)
-        X_val_np = prepare_data_for_model_fit(X_val)
-        y_val_np = prepare_data_for_model_fit(y_val)
-
-        # Handle additional features to predict
-        if additional_features: 
-            output_vars = ["output_temp", "output_lsm", "output_orog"]
-            y_train_np  = {output_vars[i]: y_train_np[:, :, :, i] for i in range(len(output_vars))}
-            y_val_np = {output_vars[i]: y_val_np[:, :, :, i] for i in range(len(output_vars))}
-
-            loss_type = {output_vars[i]: loss_type for i in range(len(output_vars))}
-            #loss_weight = {output_vars[i]: 1.0 for i in range(len(output_vars))}
-
-        # Compile and fit the model
         self.model.compile(optimizer=optimizer, loss=loss_type)
 
+        # Fit the model using the generators
         self.history = self.model.fit(
-                    x=X_train_np, y=y_train_np,
-                    epochs=num_epochs, batch_size=batch_size,
-                    callbacks=[callback],
-                    validation_data=(X_val_np, y_val_np))    
-
+            x=train_generator.generate_batches(),
+            epochs=num_epochs,
+            steps_per_epoch=len(train_generator),
+            callbacks=[callback],
+            validation_data=val_generator.generate_batches(),
+            validation_steps=len(val_generator)
+        )
+ 
         return self.model 
      
         
@@ -248,7 +246,7 @@ class DownscalingPipeline:
             return self.denormalize(prediction_norm_array)
     
 
-    def denormalize(self, data, additional_features=False):
+    def denormalize(self, data, stats_filename='', additional_features=False):
         """
         Denormalize the normalized input data.
 
@@ -269,6 +267,8 @@ class DownscalingPipeline:
         If `additional_features` is True, 'lsm' and 'orog' variables will be denormalized in addition to 't2m'.
         """
         denormalized_data = data.copy()
+        self.__normalizer.load_stats_from_disk(stats_filename)
+
         if additional_features: 
             denormalized_data['lsm']= self.__normalizer.denormalize(data['lsm'], 'lsm')
             denormalized_data['orog']= self.__normalizer.denormalize(data['orog'], 'orog') 

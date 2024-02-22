@@ -108,7 +108,6 @@ class UNetModel:
         filters.reverse()
         encoder_features.reverse()
 
-        print(encoder_features)
 
         for i in range(num_blocks): 
             # Upsampling or Transpose Convolution - increases the spatial resolution of the feature maps 

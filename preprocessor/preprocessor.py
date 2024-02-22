@@ -65,6 +65,8 @@ def pad_lr_to_match_hr(hr_data, lr_data):
     
     return values_interp_lat
 
+
+
 def crop_era5_to_cerra(lr_data, lr_lsm_z, hr_data):
     """
     Crop the low resolution datasets to match the geographical area covered by the high resolution datasets.
@@ -136,7 +138,7 @@ def combine_data(data, additional_features, var_names):
     return combined_data
 
 
-def extract_t2m_at_specific_times(data, specific_times = ['00:00', '06:00', '12:00', '18:00']):
+def extract_t2m_at_specific_times(data, specific_times = ['12:00']):
     """
     Extracts the 't2m' data from the ERA5 dataset at specific times, per default (00:00, 06:00, 12:00, 18:00).
 
