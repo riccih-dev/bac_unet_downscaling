@@ -192,17 +192,20 @@ class DownscalingPipeline:
         callback = model_config.configure_callbacks(scheduler_type)
         optimizer = model_config.configure_optimizer(learning_rate_value)
 
-        self.model.compile(optimizer=optimizer, loss=loss_type)
+        self.model.compile(optimizer=optimizer, loss=loss_type, run_eagerly=True)
 
         # Fit the model using the generators
         self.history = self.model.fit(
             x=train_generator.generate_batches(),
+            batch_size=batch_size,
             epochs=num_epochs,
             steps_per_epoch=len(train_generator),
             callbacks=[callback],
             validation_data=val_generator.generate_batches(),
             validation_steps=len(val_generator)
         )
+
+
  
         return self.model 
      

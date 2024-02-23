@@ -21,7 +21,7 @@ class DataGenerator:
 
     def __len__(self):
         # Return the number of batches in one epoch
-        return int(np.ceil(self.num_samples / self.batch_size))
+        return self.num_samples // self.batch_size
 
     def generate_batches(self):
         self.on_epoch_end()
