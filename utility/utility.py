@@ -5,8 +5,8 @@ from sklearn.model_selection import train_test_split
 from joblib import Parallel, delayed
 import json
 import os
-
-
+import requests
+import io
 
 
 def predictions_to_xarray_additional_features(input_data, predicted_data, var_names):
@@ -101,9 +101,29 @@ def prepare_data_for_model_fit(dataset):
     return np.stack([dataset[var].values for var in dataset.data_vars], axis=-1)
 
 
+def split_data(lr_data, hr_data):
+        """
+        Splits a given xarray dataset into training, validation, and test sets.
 
+        Parameters:
+        -----------
+        data : xr.Dataset
+            Xarray dataset to be split.
+        test_size : float, optional
+            The proportion of data to include in the test split. Default is 0.2.
 
-def split_data(data, test_size=0.11):
+        Returns:
+        ----------
+        xr.Dataset: Xarray dataset for training.
+        xr.Dataset: Xarray dataset for validation.
+        xr.Dataset: Xarray dataset for testing.
+        """
+        lr_train_data, lr_val_data, lr_test_data = __split_ds(lr_data)
+        hr_train_data, hr_val_data, hr_test_data = __split_ds(hr_data)
+
+        return lr_train_data, lr_val_data, lr_test_data, hr_train_data, hr_val_data, hr_test_data
+
+def __split_ds(data, test_size=0.11):
     """
     Splits a given xarray dataset into training, validation, and test sets based on time.
 
@@ -161,18 +181,10 @@ def store_to_disk(file_name, data, file_path="./data/"):
     """
     file = f"{file_path}{file_name}.nc"
 
-    # first option
     write_job = data.to_netcdf(file, compute=False) #try zarr
 
     print(f"Writing to {file}")
     write_job.compute()
-
-    # second option 
-    path = "./data/"
-    write_job = data.to_zarr(path, mode='w', compute=False)
-
-    print(f"Writing to {file}")
-    write_job.compute(progress_bar=True)
 
 
 def load_from_disk(file_name, file_path="./data/"):
@@ -214,8 +226,8 @@ def find_input_shape(data):
     return (latitude_points, longitude_points, num_variables) 
 
 
-def save_to_json(filename_suffix, model_setup, training_loss, validation_loss, metric_results):
-    filename = os.path.join('results', f'model_and_results_{filename_suffix}.json')
+def save_to_json(filename_suffix, model_setup, training_loss, validation_loss, metric_results, result_path):
+    filename = os.path.join(result_path, f'model_and_results_{filename_suffix}.json')
 
     # Convert float32 values to float64 for serialization
     training_loss = [float(item) for item in training_loss]
@@ -237,6 +249,26 @@ def save_to_json(filename_suffix, model_setup, training_loss, validation_loss, m
 
     with open(filename, 'w') as json_file:
         json.dump(output_data, json_file, indent=4)
+
+
+def load_via_url(urls):
+    """
+    Loads datasets from a list of URLs and concatenates them along the 'time' dimension.
+
+    Args:
+        urls (list): List of URLs pointing to dataset files.
+
+    Returns:
+        xr.Dataset: Xarray dataset containing concatenated data.
+    """
+
+    datasets = []
+    for url in urls:
+        print(f"Loading dataset from URL: {url}")
+        dataset = xr.open_dataset(io.BytesIO(requests.get(url, allow_redirects=True).content), engine='h5netcdf')
+        datasets.append(dataset)
+
+    return xr.concat(datasets, dim='time')
 
 
 

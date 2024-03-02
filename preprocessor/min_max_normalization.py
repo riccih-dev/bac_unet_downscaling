@@ -121,22 +121,6 @@ class MinMaxNormalizatiton:
 
         return normalized_data
     
-
-    def normalize_t2m_for_prediciton(self,lr_data, var_name='t2m'):
-        lr_normalized = lr_data.copy()
-
-        # Extract the specified variable from the datasets
-        lr_variable = lr_data[var_name]
-
-        # Retrieve the stored min and max values for lr data
-        xmin = self.__variable_stats['lr_t2m']['xmin']
-        xmax = self.__variable_stats['lr_t2m']['xmax']
-        
-        lr_normalized[var_name] = (lr_variable - xmin) / (xmax - xmin)
-
-        return lr_normalized
-    
-
     def denormalize(self, data, var_name):
         """
         Denormalize the input data for a specific variable using Min-Max denormalization.

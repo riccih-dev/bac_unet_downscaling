@@ -168,14 +168,8 @@ class StandardizedAnomalies:
         """
         if var_name not in self.__variable_stats:
             raise Exception(f"Climatology not calculated for variable: {var_name}")
-        
-        #predicted_data = anomalies.copy()
-        #anomalies_variable = anomalies[var_name]
 
         mu = np.array(self.__variable_stats[var_name]['mu'])
         sigma = np.array(self.__variable_stats[var_name]['sigma'])
-
-        
-        #predicted_data[var_name] = data * sigma + mu
 
         return anomalies * sigma + mu

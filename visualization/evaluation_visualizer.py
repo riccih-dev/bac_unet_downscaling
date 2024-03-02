@@ -2,8 +2,6 @@ import matplotlib.pyplot as plt
 from cartopy import crs as ccrs, feature as cfeature
 import os
 
-
-# FIXME: check which methods i really need
 class EvaluationVisualization:
     def __init__(self):
         """

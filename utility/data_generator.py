@@ -20,21 +20,39 @@ class DataGenerator:
             np.random.shuffle(self.indices)
 
     def __len__(self):
-        # Return the number of batches in one epoch
+        '''
+        returns the number of batches per epoch 
+
+        Returns:
+        --------
+        int: 
+            number of batches in one epoch
+        '''
+        # it returns the number of times the generate_batches method will be called during one epoch.
         return self.num_samples // self.batch_size
 
     def generate_batches(self):
         self.on_epoch_end()
-        for start in range(0, self.num_samples, self.batch_size):
-            end = min(start + self.batch_size, self.num_samples)
-            batch_indices = self.indices[start:end]
+        while True: 
+            for start in range(0, self.num_samples, self.batch_size):   # 0 - num_sample, batch_size is step size 
+                end = min(start + self.batch_size, self.num_samples)
+                batch_indices = self.indices[start:end]
 
-            # Select the subset of time corresponding to the batch
-            batch_data = self.data.isel(time=batch_indices)
-            batch_labels = self.labels.isel(time=batch_indices)
+                #print('\n')
+                #print('Training batch ', start / self.batch_size,' of total samples ', self.num_samples,' with batch size of ',self.batch_size, ' indices ', start,':', end, ' and total number of batches of: ', self.num_samples // self.batch_size)
+                #print('inidces:', batch_indices)
 
-            # Convert xarray Datasets to numpy arrays
-            batch_features = np.stack([batch_data[var].values for var in batch_data.data_vars], axis=-1)
-            batch_labels = np.stack([batch_labels[var].values for var in batch_labels.data_vars], axis=-1)
+                # Select the subset of time corresponding to the batch
+                batch_data = self.data.isel(time=batch_indices)
+                batch_labels = self.labels.isel(time=batch_indices)
 
-            yield batch_features, batch_labels
+                # Convert xarray Datasets to numpy arrays
+                batch_features = np.stack([batch_data[var].values for var in batch_data.data_vars], axis=-1)
+                batch_labels = np.stack([batch_labels[var].values for var in batch_labels.data_vars], axis=-1)
+
+                #print(batch_features.shape)
+                #print(batch_labels.shape)
+
+                yield batch_features, batch_labels
+
+

@@ -80,7 +80,7 @@ class DownscalingPipeline:
         return era5, era5_lsm_orog
 
 
-    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, stats_filename='', crop_region = None, reset_climatology_stats = True):
+    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, stats_filename='', crop_region = [6.5, 54.0, 16.5, 42.5], reset_climatology_stats = True):
         '''
         Performs pre-processing step by cropping spatial dimension, 
         and normalizes additional variables using standardized anomalies or min-max normalization.
@@ -134,29 +134,6 @@ class DownscalingPipeline:
         return combined_anomalies_lr_data, anomalies_hr_data
 
 
-    def split_data(self, lr_data, hr_data):
-        """
-        Splits a given xarray dataset into training, validation, and test sets.
-
-        Parameters:
-        -----------
-        data : xr.Dataset
-            Xarray dataset to be split.
-        test_size : float, optional
-            The proportion of data to include in the test split. Default is 0.2.
-
-        Returns:
-        ----------
-        xr.Dataset: Xarray dataset for training.
-        xr.Dataset: Xarray dataset for validation.
-        xr.Dataset: Xarray dataset for testing.
-        """
-        lr_train_data, lr_val_data, lr_test_data = split_data(lr_data)
-        hr_train_data, hr_val_data, hr_test_data = split_data(hr_data)
-
-        return lr_train_data, lr_val_data, lr_test_data, hr_train_data, hr_val_data, hr_test_data
-    
-
     def fit_model(self, train_generator, val_generator, scheduler_type, learning_rate_value, filters, loss_type='mae', num_epochs=50, batch_size=32, show_summary=False):
         """
         Fit the U-Net model with training data generator and validate using validation data generator.
@@ -197,20 +174,18 @@ class DownscalingPipeline:
         # Fit the model using the generators
         self.history = self.model.fit(
             x=train_generator.generate_batches(),
+            steps_per_epoch = len(train_generator),
             batch_size=batch_size,
             epochs=num_epochs,
-            steps_per_epoch=len(train_generator),
             callbacks=[callback],
             validation_data=val_generator.generate_batches(),
             validation_steps=len(val_generator)
         )
 
-
- 
         return self.model 
      
         
-    def predict(self, lr_data, additional_features=False):
+    def predict(self, lr_data, stats_file, additional_features=False):
         '''
         downscales low-resolution temperature data using trained UNet model
 
@@ -229,10 +204,10 @@ class DownscalingPipeline:
 
         if additional_features:
             prediction_norm_array= predictions_to_xarray_additional_features(lr_data, predictions_normalized, ['t2m', 'lsm', 'orog'])
-            return  self.denormalize(prediction_norm_array, True)
+            return  self.denormalize(prediction_norm_array, stats_file, True)
         else:
             prediction_norm_array = predictions_to_xarray_t2m(lr_data, predictions_normalized)
-            return self.denormalize(prediction_norm_array)
+            return self.denormalize(prediction_norm_array, stats_file)
     
 
     def denormalize(self, data, stats_filename='', additional_features=False):
@@ -287,4 +262,5 @@ class DownscalingPipeline:
         return metric_results
 
     def get_history(self):
+        """returns the models history"""
         return self.history.history

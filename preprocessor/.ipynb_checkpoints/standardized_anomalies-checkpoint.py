@@ -128,18 +128,6 @@ class StandardizedAnomalies:
         # standardized anomalies: anomalies / deviation
         return (data - mu)/sigma
     
-    def normalize_t2m_for_prediciton(self,lr_data, var_name='t2m'):
-        lr_normalized = lr_data.copy()
-
-        # Extract the specified variable from the datasets
-        lr_variable = lr_data[var_name]
-    
-        anomalies_lr_data = self.__calculate_standardized_anomalies(lr_variable, var_name)
-
-        lr_normalized[var_name] = anomalies_lr_data
-
-        return lr_normalized
-    
 
     def denormalize(self, anomalies, var_name='t2m'):
         """

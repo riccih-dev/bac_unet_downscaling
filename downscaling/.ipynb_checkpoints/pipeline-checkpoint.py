@@ -217,10 +217,6 @@ class DownscalingPipeline:
         prediced downscaled temperature
 
         '''        
-        # Standardize new low-resolution data # NOO NEED, already preprocessed 
-        #data_standardized = self.__normalizer.normalize_t2m_for_prediciton(lr_data)
-        #data_standardized = data_standardized['t2m']
-        
         t2m_data = lr_data['t2m']
 
         # peforms prediction using trained U-Net model

@@ -1,5 +1,6 @@
 import xarray as xr
 import pandas as pd
+import dask.array.core as da
 
 '''
 Utility functions for Preprocessing-Step
@@ -150,7 +151,7 @@ def combine_data(data, additional_features, var_names):
     return combined_data
 
 
-def extract_t2m_at_specific_times(data, specific_times = ['12:00']):
+def extract_t2m_at_specific_times(data, specific_times = ['12:00'], chunk_size=10):
     """
     Extracts the 't2m' data from the ERA5 dataset at specific times, per default (00:00, 06:00, 12:00, 18:00).
 
@@ -167,7 +168,23 @@ def extract_t2m_at_specific_times(data, specific_times = ['12:00']):
     time_indices = [i for i, t in enumerate(times) if pd.to_datetime(t).strftime('%H:%M') in specific_times]
 
     # Extract t2m data at specific times
-    t2m_at_specific_times = data['t2m'].isel(time=time_indices)
+    t2m = data['t2m']
+
+    if isinstance(t2m.data, da.Array):
+        # Iterate over chunks of time indices
+        chunks = [time_indices[i:i + chunk_size] for i in range(0, len(time_indices), chunk_size)]
+        t2m_at_specific_times_list = []
+
+        for chunk in chunks:
+            t2m_at_specific_times_chunk = t2m.isel(time=chunk).compute()
+            t2m_at_specific_times_list.append(t2m_at_specific_times_chunk)
+
+        t = 1
+        # Concatenate chunks back into a single DataArray
+        t2m_at_specific_times = xr.concat(t2m_at_specific_times_list, dim='time')
+    else:
+        # DataArray case
+        t2m_at_specific_times = t2m.isel(time=time_indices)
 
     # Create a new dataset with the same structure as the original dataset
     extracted_data = xr.Dataset({
@@ -180,6 +197,8 @@ def extract_t2m_at_specific_times(data, specific_times = ['12:00']):
         },
         attrs={'units': 'K', 'long_name': '2 metre temperature'}
     )
+
+    print("time extracting completed")
 
     return extracted_data
 
