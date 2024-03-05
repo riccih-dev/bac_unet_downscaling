@@ -44,9 +44,7 @@ class StandardizedAnomalies:
         tuple of xr.Dataset
             Tuple containing the normalized low-resolution and high-resolution datasets for temperature using standardized anomalies.
         """
-        normalized_lr = self.__normalize(lr_data, 't2m', 'lr_t2m', dim=['time'])
-        normalized_hr = self.__normalize(hr_data, 't2m', 'hr_t2m', dim=['time'])
-        return normalized_lr, normalized_hr
+        return self.__normalize(lr_data, hr_data, ['t2m', 't2m'])
     
 
     def normalize_additional_features(self, lr_data, hr_data, var_names):
@@ -68,12 +66,10 @@ class StandardizedAnomalies:
             Tuple containing the normalized low-resolution and high-resolution datasets for additional features using standardized anomalies.
         """
         for var_name in var_names:
-            lr_data = self.__normalize(lr_data, var_name[0], 'lr_'+var_name[0], dim=['time', 'longitude', 'latitude'])
-            hr_data = self.__normalize(hr_data, var_name[1], 'hr_'+var_name[1])
+            lr_data, hr_data = self.__normalize(lr_data, hr_data, var_name)
 
         return lr_data, hr_data
     
-
     def reset_variable_stats(self):
         """
         This method clears the stored statistics, including mean and standard deviation,
@@ -81,8 +77,7 @@ class StandardizedAnomalies:
         """
         self.__variable_stats = {}
 
-
-    def __normalize(self, data, var_name, data_name, dim=['time']):
+    def __normalize(self, lr_data, hr_data, var_name):
         """
         Normalize the input low-resolution and high-resolution datasets for a specific variable using standardized anomalies.
 
@@ -100,21 +95,27 @@ class StandardizedAnomalies:
         tuple of xr.Dataset
             Tuple containing the normalized low-resolution and high-resolution datasets for a specific variable using standardized anomalies.
         """
-        normalized_data = data.copy()
-        data_variable = data[var_name]
+        lr_normalized, hr_normalized = lr_data.copy(), hr_data.copy()
 
-        self.__calculate_climatology(data_variable, data_name, dim)
+        # Extract the specified variable from the datasets
+        lr_variable = lr_data[var_name[0]]
+        hr_variable = hr_data[var_name[1]]
+
+        # Calculate climatology for high resolution data
+        self.__calculate_climatology(hr_variable, var_name[1])
 
         # Standardize high- data and low-resolution data
-        normalized_variable = self.__calculate_standardized_anomalies(data_variable, data_name) 
+        anomalies_lr_data = self.__calculate_standardized_anomalies(lr_variable, var_name[1]) #use var_name of hr, as this was used for storing climatology variables
+        anomalies_hr_data = self.__calculate_standardized_anomalies(hr_variable, var_name[1])
 
         # Update the original datasets with the normalized values
-        normalized_data[var_name] = normalized_variable
+        lr_normalized[var_name[0]] = anomalies_lr_data
+        hr_normalized[var_name[1]] = anomalies_hr_data
 
-        return normalized_data
+        return lr_normalized, hr_normalized
 
 
-    def __calculate_climatology(self, data_variable, data_name, dim):
+    def __calculate_climatology(self, hr_data, var_name):
         '''
         calculates climatology (long-term average) of high-resolution data
 
@@ -122,13 +123,13 @@ class StandardizedAnomalies:
         ----------
         - hr_data: array high resolution data
         '''
-        mu = data_variable.mean(dim=dim)
-        sigma = data_variable.std(dim=dim)
+        mu = np.mean(hr_data)
+        sigma = np.std(hr_data)
 
-        self.__variable_stats[data_name] = {'mu': mu, 'sigma': sigma}
+        self.__variable_stats[var_name] = {'mu': mu, 'sigma': sigma}
 
 
-    def __calculate_standardized_anomalies(self, data, data_name):
+    def __calculate_standardized_anomalies(self, data, var_name):
         """
         Calculate anomalies and standardize them by using climatology.
 
@@ -142,8 +143,8 @@ class StandardizedAnomalies:
         xr.Dataset
             Standardized anomalies.
         """    
-        mu = self.__variable_stats[data_name]['mu']
-        sigma = self.__variable_stats[data_name]['sigma']
+        mu = self.__variable_stats[var_name]['mu']
+        sigma = self.__variable_stats[var_name]['sigma']
 
         # anomalies: data - climatology (mean) 
         # standardized anomalies: anomalies / deviation
@@ -166,12 +167,10 @@ class StandardizedAnomalies:
         xarray.Dataset
             Predicted data obtained by denormalizing anomalies.
         """
-        data_name = 'lr_'+var_name 
+        if var_name not in self.__variable_stats:
+            raise Exception(f"Climatology not calculated for variable: {var_name}")
 
-        if data_name not in self.__variable_stats:
-            raise ValueError(f"Variable {data_name} not found in variable stats. Make sure to normalize the data first.")
- 
-        mu = np.array(self.__variable_stats[data_name]['mu'])
-        sigma = np.array(self.__variable_stats[data_name]['sigma'])
+        mu = np.array(self.__variable_stats[var_name]['mu'])
+        sigma = np.array(self.__variable_stats[var_name]['sigma'])
 
         return anomalies * sigma + mu

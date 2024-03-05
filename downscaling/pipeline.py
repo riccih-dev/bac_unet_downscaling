@@ -4,7 +4,7 @@ from model.modelconfig import UNetModelConfiguration
 from data_loader.data_loader import DataLoader
 from preprocessor.standardized_anomalies import StandardizedAnomalies
 from preprocessor.min_max_normalization import MinMaxNormalizatiton
-from preprocessor.preprocessor import crop_spatial_dimension, crop_era5_to_cerra, pad_lr_to_match_hr, sort_ds, combine_data, extract_t2m_at_specific_times
+from preprocessor.preprocessor import crop_spatial_dimension, pad_lr_to_match_hr, sort_ds, combine_data, extract_t2m_at_specific_times, transform, reverse_transform, winsorize_outliers
 from evaluation.metrics import DownscalingMetrics
 from visualization.evaluation_visualizer import EvaluationVisualization
 from utility.utility import predictions_to_xarray_additional_features, predictions_to_xarray_t2m, prepare_data_for_model_fit, split_data, find_input_shape
@@ -15,6 +15,22 @@ import pandas as pd
 import numpy as np 
 import tensorflow as tf
 import tabulate
+
+# importing necessary libraries 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scipy.stats as stats
+import statsmodels.api as sm
+from sklearn.preprocessing import PowerTransformer
+from scipy.special import inv_boxcox
+
+from scipy.stats.mstats import winsorize
+
+sns.set_theme()
+sns.set_palette(palette = "rainbow")
+
 
 
 class DownscalingPipeline: 
@@ -78,9 +94,8 @@ class DownscalingPipeline:
         era5, era5_lsm_orog = data_loader.load_era5_data()
 
         return era5, era5_lsm_orog
-
-
-    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, stats_filename='', crop_region = [6.5, 54.0, 16.5, 42.5], reset_climatology_stats = True):
+    
+    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, transform = False, stats_filename='./config/stats', crop_region = [6.5, 42.5, 16.5, 54.0], reset_climatology_stats = True):
         '''
         Performs pre-processing step by cropping spatial dimension, 
         and normalizes additional variables using standardized anomalies or min-max normalization.
@@ -110,13 +125,13 @@ class DownscalingPipeline:
 
         lr_data, hr_data = extract_t2m_at_specific_times(lr_data), extract_t2m_at_specific_times(hr_data)
     
-        # CROP ERA5 to match spatial area of CERRA DS
-        # TODO: this step is needed ?
-        #lr_data, lr_lsm_z = crop_era5_to_cerra(lr_data, lr_lsm_z, hr_data)
-
         # Crop spatial dimensions to ensure divisibility for neural network operations
         hr_data = crop_spatial_dimension(hr_data, crop_region)
         hr_lsm_orog = crop_spatial_dimension(hr_lsm_orog, crop_region)
+
+        if transform:
+            lr_data = self.transform(lr_data)
+            hr_data = self.transform(hr_data)
 
         # Pad era5 data to match the dimensions of cerra using interpolation
         lr_data = pad_lr_to_match_hr(hr_data, lr_data)
@@ -129,9 +144,78 @@ class DownscalingPipeline:
         self.__normalizer.store_stats_to_disk(stats_filename)
 
         combined_anomalies_lr_data = combine_data(anomalies_lr_data, anomalies_lr_lsm_z, ['lsm', 'z'])
-        #combined_anomalies_hr_data = combine_data(anomalies_hr_data, anomalies_hr_lsm_orog, ['lsm', 'orog'])
-
+        
         return combined_anomalies_lr_data, anomalies_hr_data
+    
+
+    def transform(self, data, feature='t2m', handle_outlier = False, print_info = False):  
+            data_transformed = data.copy()
+        
+            # -- Transform the data --- 
+            self.transformer = PowerTransformer(standardize=False, method='yeo-johnson') 
+            yeojohn_df = pd.DataFrame(self.transformer.fit_transform(data[feature].values.reshape(-1,1)))
+            
+            data_transformed['t2m'] = xr.DataArray(yeojohn_df[0].values.reshape(data_transformed['t2m'].shape),
+                                                    coords=data_transformed['t2m'].coords,
+                                                    dims=data_transformed['t2m'].dims)
+            
+            #Lets get the Lambdas that were found
+            print (self.transformer.lambdas_)
+
+            if print_info:
+                print(f"Skewness was {round(data.to_dataframe().skew()[feature],2)} before & is {round(yeojohn_df.skew()[0],2)} after Yeo-johnson transformation.")
+
+                ev = EvaluationVisualization()
+                print('Before transformation: ')
+                ev.histograms_single_ds(data)
+                ev.qq_plot(data)
+                self.show_outliers(data)
+
+                print('After transformation: ')
+                ev.histograms_single_ds(data_transformed)
+                ev.qq_plot(data_transformed)
+
+            
+             # --- Handle Outlier:  Winsorizing ---
+            if handle_outlier:
+                data_winsorized = winsorize(data_transformed[feature].values, limits=(0.005, 0.005))
+                data_transformed['t2m']= xr.DataArray(data_winsorized,  coords=data[feature].coords,  dims=data[feature].dims,  name=feature)
+
+                if print_info:
+                    print('Before Outlier Handling: ')
+                    self.show_outliers(data)
+
+                    print('After Outlier Handling:')
+                    self.show_outliers(data_transformed)
+            
+
+            return data_transformed
+
+    def show_outliers(self, data):
+        t2m_values = data['t2m'].values.flatten()
+
+        # Identify outliers using IQR method
+        q1 = np.percentile(t2m_values, 25)
+        q3 = np.percentile(t2m_values, 75)
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+
+        outliers_indices = np.where((t2m_values < lower_bound) | (t2m_values > upper_bound))
+
+        # Calculate the ratio of outliers
+        ratio_of_outliers = len(outliers_indices[0]) / len(t2m_values) * 100
+        print(f"{len(outliers_indices[0])} Outliers detected of {len(t2m_values)} - {ratio_of_outliers:.2f}%")
+        if len(outliers_indices[0]) > 0:
+            print(f"Outliers detected at indices: {outliers_indices[0]}")
+            # Show some of the outliers (adjust the number as needed)
+            print(f"Example of some outliers: {t2m_values[outliers_indices[0][:5]]}")
+
+        # Boxplot
+        plt.figure(figsize=(10, 6))
+        sns.boxplot(x=t2m_values)
+        plt.title('Boxplot of the original data')
+        plt.show()
 
 
     def fit_model(self, train_generator, val_generator, scheduler_type, learning_rate_value, filters, loss_type='mae', num_epochs=50, batch_size=32, show_summary=False):
@@ -204,13 +288,13 @@ class DownscalingPipeline:
 
         if additional_features:
             prediction_norm_array= predictions_to_xarray_additional_features(lr_data, predictions_normalized, ['t2m', 'lsm', 'orog'])
-            return  self.denormalize(prediction_norm_array, stats_file, True)
+            return  self.denormalize(data = prediction_norm_array, stats_filename=stats_file, additional_features=True)
         else:
             prediction_norm_array = predictions_to_xarray_t2m(lr_data, predictions_normalized)
-            return self.denormalize(prediction_norm_array, stats_file)
+            return self.denormalize(data = prediction_norm_array, stats_filename=stats_file)
     
 
-    def denormalize(self, data, stats_filename='', additional_features=False):
+    def denormalize(self, data, stats_filename='', is_transformed=False, additional_features=False):
         """
         Denormalize the normalized input data.
 
@@ -238,6 +322,12 @@ class DownscalingPipeline:
             denormalized_data['orog']= self.__normalizer.denormalize(data['orog'], 'orog') 
 
         denormalized_data['t2m'] = self.__normalizer.denormalize(data['t2m'], 't2m')
+
+        if is_transformed:
+            detransformed_t2m = pd.DataFrame(self.transformer.inverse_transform(denormalized_data['t2m'].values.reshape(-1,1)))
+            denormalized_data['t2m']= xr.DataArray(detransformed_t2m[0].values.reshape(data['t2m'].shape),
+                                                        coords=data['t2m'].coords,
+                                                        dims=data['t2m'].dims)
         
         return denormalized_data
 

@@ -16,6 +16,7 @@ class MinMaxNormalizatiton:
         with open(filename, 'wb') as file:
             pickle.dump(self.__variable_stats, file)
 
+
     def load_stats_from_disk(self, filename):
         """
         Load variable statistics from disk using pickle.

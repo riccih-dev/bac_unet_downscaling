@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from cartopy import crs as ccrs, feature as cfeature
 import os
+from scipy.stats import probplot
+import numpy as np
 
 class EvaluationVisualization:
     def __init__(self):
@@ -121,7 +123,7 @@ class EvaluationVisualization:
         plt.close()
 
 
-    def histograms(self, actual_data, predicted_data,filename_suffix, show_graph = True):
+    def histograms(self, actual_data, predicted_data,filename_suffix='', var = 't2m', show_graph = True):
         """
         Plot histograms of predicted and actual temperature values
         to understand the distribution and identify any biases.
@@ -134,16 +136,13 @@ class EvaluationVisualization:
             Predicted high-resolution temperature data.
         """
         # Extracting the temperature values for histograms
-        actual_values = actual_data['t2m'].values.flatten()
-        predicted_values = predicted_data['t2m'].values.flatten()
-
-        print(actual_values)
-        print(predicted_values)
+        actual_values = actual_data[var].values.flatten()
+        predicted_values = predicted_data[var].values.flatten()
 
         # Create histograms
         plt.figure(figsize=(12, 6))
-        plt.hist(actual_values, bins=50, alpha=0.5, label='Actual Data')
-        plt.hist(predicted_values, bins=50, alpha=0.5, label='Predicted Data')
+        plt.hist(actual_values, bins=50, alpha=0.5, label=f'Actual {var} Data')
+        plt.hist(predicted_values, bins=50, alpha=0.5, label=f'Predicted {var} Data')
 
         # Add labels and legend
         plt.title("Histograms")
@@ -151,11 +150,78 @@ class EvaluationVisualization:
         plt.ylabel("Frequency")
         plt.legend()
 
-        filename = os.path.join('results', f'histogram_plot_{filename_suffix}.png')
-        plt.savefig(filename)
+        if filename_suffix != '':
+            filename = os.path.join('results', f'histogram_plot_{filename_suffix}.png')
+            plt.savefig(filename)
+            
         if show_graph:
             plt.show()
             
         plt.close()
+
+    # TODO: put into other class
+    def histograms_single_ds(self, data, var_name = 't2m'):
+        """
+        Plot histograms of predicted and actual temperature values
+        to understand the distribution and identify any biases.
+
+        Parameters:
+        -----------
+        actual_data : xarray.Dataset
+            Actual high-resolution temperature data.
+        predicted_data : xarray.Dataset
+            Predicted high-resolution temperature data.
+        """
+        data = data[var_name].values.flatten()
+
+        # Create histograms
+        plt.figure(figsize=(12, 6))
+        plt.hist(data, bins=50, alpha=0.5, label=f'{var_name} Data')
+
+        # Add labels and legend
+        plt.title("Histograms")
+        plt.xlabel(f'{var_name}')
+        plt.ylabel("Frequency")
+        plt.legend()
+            
+        plt.show()
+            
+        plt.close()
+
+
+
+
+    # TODO: put into other class
+    def qq_plot(self, data, distribution='norm', line='45', var_name='t2m'):
+        """
+        Create a Q-Q plot for the given data.
+
+        Parameters:
+        - data: 1D array-like, the data to be plotted.
+        - distribution: str, optional, the theoretical distribution to compare against (default is 'norm').
+        - line: {'45', 's', 'r'}, optional, type of Q-Q plot to draw (default is '45').
+        - var_name: str, optional, variable name for labeling the plot (default is 'Variable').
+        """
+        fig, ax = plt.subplots()
+        probplot(data[var_name].values.flatten(), dist=distribution, plot=ax)
+        ax.set_title(f'Q-Q Plot for {var_name}')
+        ax.set_xlabel('Theoretical Quantiles')
+        ax.set_ylabel('Sample Quantiles')
+
+        if line == '45':
+            ax.plot(ax.get_xlim(), ax.get_xlim(), linestyle='--', color='red', label='45-degree line')
+        elif line == 's':
+            sorted_data = np.sort(data)
+            ax.plot(sorted_data, sorted_data, linestyle='--', color='red', label='Sorted line')
+        elif line == 'r':
+            residuals = np.sort(data - np.mean(data))
+            ax.plot(residuals, residuals, linestyle='--', color='red', label='Residuals line')
+
+        ax.legend()
+        plt.show()
+
+
+
+
 
 

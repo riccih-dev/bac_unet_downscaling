@@ -1,6 +1,9 @@
 import xarray as xr
 import pandas as pd
 import dask.array.core as da
+import numpy as np
+from scipy.stats import boxcox, yeojohnson
+from scipy.stats.mstats import winsorize
 
 '''
 Utility functions for Preprocessing-Step
@@ -61,7 +64,7 @@ def crop_spatial_dimension(data, crop_region=None, divisible_factor=2):
 
     return cropped_data
 
-def pad_lr_to_match_hr(hr_data, lr_data):
+def pad_lr_to_match_hr(hr_data, lr_data, var_names=['t2m'], method="linear"):
     """
     Pad the low-resolution data to match the dimensions of high-resolution data using interpolation.
 
@@ -71,14 +74,138 @@ def pad_lr_to_match_hr(hr_data, lr_data):
         Padded low-resolution dataset.
     """
     # Reindex the low-resolution data to match the dimensions of high-resolution data
+    #lr_data_reindexed = lr_data.reindex(latitude=hr_data['latitude'], longitude=hr_data['longitude'])
+
+    #values_interp_long = lr_data_reindexed.interpolate_na(dim='longitude', method = 'linear', fill_value="extrapolate")
+    #values_interp_lat = values_interp_long.interpolate_na(dim='latitude', method = 'linear', fill_value="extrapolate") # epxloration needed as some latitude dim constist only of nan
+    
+    #return values_interp_lat
+
+    # Reindex the low-resolution data to match the dimensions of high-resolution data
     lr_data_reindexed = lr_data.reindex(latitude=hr_data['latitude'], longitude=hr_data['longitude'])
 
-    values_interp_long = lr_data_reindexed.interpolate_na(dim='longitude', method = 'linear', fill_value="extrapolate")
-    values_interp_lat = values_interp_long.interpolate_na(dim='latitude', method = 'linear', fill_value="extrapolate") # epxloration needed as some latitude dim constist only of nan
-    
+    if method == "linear":
+        values_interp_long = lr_data_reindexed.interpolate_na(dim='longitude', method='linear', fill_value="extrapolate")
+        values_interp_lat = values_interp_long.interpolate_na(dim='latitude', method='linear', fill_value="extrapolate")
+    elif method == "nearest":
+        values_interp_long = lr_data_reindexed.interpolate_na(dim='longitude', method='nearest')
+        values_interp_lat = values_interp_long.interpolate_na(dim='latitude', method='nearest')
+    elif method == "knn":
+        # not implemented 
+        raise ValueError("Unsupported padding method: {}".format(method))
+    elif method == "mirroring":
+        # Use mirroring padding
+        values_interp_long = lr_data_reindexed.pad(
+            longitude=(
+                ((lr_data_reindexed.dims['longitude'] - lr_data.dims['longitude']) // 2) % lr_data_reindexed.dims['longitude'],
+                ((lr_data_reindexed.dims['longitude'] - lr_data.dims['longitude']) // 2) % lr_data_reindexed.dims['longitude']
+            ),
+            mode="wrap"
+        )
+        values_interp_lat = values_interp_long.pad(
+            latitude=(
+                ((lr_data_reindexed.dims['latitude'] - lr_data.dims['latitude']) // 2) % lr_data_reindexed.dims['latitude'],
+                ((lr_data_reindexed.dims['latitude'] - lr_data.dims['latitude']) // 2) % lr_data_reindexed.dims['latitude']
+            ),
+            mode="wrap"
+        )
+    elif method == "reflection":
+        # Use reflection padding
+        values_interp_long = lr_data_reindexed.pad(longitude=((lr_data_reindexed.dims['longitude'] - lr_data.dims['longitude']) // 2 + 1, (lr_data_reindexed.dims['longitude'] - lr_data.dims['longitude']) // 2), mode="reflect")
+        values_interp_lat = values_interp_long.pad(latitude=((lr_data_reindexed.dims['latitude'] - lr_data.dims['latitude']) // 2 + 1, (lr_data_reindexed.dims['latitude'] - lr_data.dims['latitude']) // 2), mode="reflect")
+    else:
+        raise ValueError("Unsupported padding method: {}".format(method))
+
     return values_interp_lat
 
 
+
+
+def transform(data, var_names=['t2m'], transform_type='sqrt'):
+    transformed_data = data.copy()
+
+    for var_name in var_names:
+        var_values = transformed_data[var_name]
+
+        if transform_type == "log":
+            data_adjusted = var_values + 1e-8
+            transformed_values = np.log(data_adjusted)
+        elif transform_type == "sqrt":
+            transformed_values = np.sqrt(var_values)
+        elif transform_type == "boxcox":
+            transformed_values = boxcox(var_values.values.flatten())
+        elif transform_type == "yeojohnson":
+            transformed_values, _ = yeojohnson(var_values)
+        else:
+            transformed_values = var_values
+
+        transformed_data[var_name] = transformed_values
+
+    return transformed_data
+
+
+def reverse_transform(transformed_data, var_names=['t2m'], transform_type='log'):
+    original_data = transformed_data.copy()
+
+    for var_name in var_names:
+        var_values = original_data[var_name]
+
+        if transform_type == "log":
+            original_values = np.exp(var_values)
+        elif transform_type == "sqrt":
+            original_values = np.square(var_values)
+        elif transform_type == "boxcox":
+            original_values = boxcox(var_values, inverse=True)
+        elif transform_type == "yeojohnson":
+            original_values = yeojohnson(var_values, inverse=True)
+        else:
+            original_values = var_values
+
+        original_data[var_name] = original_values
+
+    return original_data
+
+
+def remove_outliers_iqr(data, var_names=['t2m']):
+    """
+    Remove outliers from data using Interquartile Range (IQR).
+
+    Args:
+        data (np.ndarray): Data array.
+
+    Returns:
+        np.ndarray: Data array with outliers removed.
+    """
+    for var_name in var_names:
+        var_values = data[var_name]
+        q1 = np.percentile(var_values, 25)
+        q3 = np.percentile(var_values, 75)
+        iqr_val = q3 - q1
+        lower_bound = q1 - 1.5 * iqr_val
+        upper_bound = q3 + 1.5 * iqr_val
+        data[var_name] = np.clip(var_values, lower_bound, upper_bound)
+
+    return data
+
+def winsorize_outliers(data, var_names=['t2m'], limits=[0.05, 0.05]):
+    """
+    Winsorize outliers from data.
+
+    Args:
+        data (np.ndarray): Data array.
+        var_names (list): List of variable names to process.
+        limits (list): Winsorizing limits for each variable.
+
+    Returns:
+        np.ndarray: Data array with outliers winsorized.
+    """
+    winsorized_data = data.copy()
+
+    for var_name in var_names:
+        var_values = winsorized_data[var_name]
+        winsorized_data[var_name] = winsorize(var_values, limits=limits)
+
+    return winsorized_data
 
 def crop_era5_to_cerra(lr_data, lr_lsm_z, hr_data):
     """
@@ -198,7 +325,7 @@ def extract_t2m_at_specific_times(data, specific_times = ['12:00'], chunk_size=1
         attrs={'units': 'K', 'long_name': '2 metre temperature'}
     )
 
-    print("time extracting completed")
+    #print("time extracting completed")
 
     return extracted_data
 

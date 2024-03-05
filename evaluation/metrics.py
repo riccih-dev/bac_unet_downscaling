@@ -53,8 +53,7 @@ class DownscalingMetrics:
     
     def __calculate_bias(self):
         """Calculate Bias."""
-        bias = np.mean(self.y_true - self.y_pred)
-        return bias
+        return np.mean(self.y_true - self.y_pred)
 
 
 

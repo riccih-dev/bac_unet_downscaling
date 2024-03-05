@@ -115,10 +115,6 @@ class UNetModel:
             
             # Skip Connections - conncets correpsonding encoder and decoder layer - to obtain spatial information
             conv = Concatenate(axis=3)([deconv, encoder_features[i]])
-
-            #[(None, 110, 140, 448), (None, 221, 281, 448)] # stride = (1,1)
-            # input_shape=[(None, 220, 280, 448), (None, 221, 281, 448)] # stride (2,2)
-            # input_shape=[(None, 330, 420, 448), (None, 221, 281, 448)] # stride = (3,3)
             
             # there are at least two convolutional Layers - these capture fine grained features
             for _ in range(num_conv_layers):
@@ -128,9 +124,8 @@ class UNetModel:
 
 
     
-
     def __conv_block(self, conv, num_filters: int, kernel_size: tuple = (3, 3), activation: str = 'tanh', padding: str = 'same',
-                       kernel_initializer: str = 'he_normal', reg_val = 0.00000001, use_batch_normalization: bool = True):
+                       kernel_initializer: str = 'he_normal', reg_val = 0.001, use_batch_normalization: bool = True):
         """
         Convolutional block with optional batch normalization.
 
