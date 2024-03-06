@@ -122,7 +122,7 @@ class MinMaxNormalizatiton:
 
         return normalized_data
     
-    def denormalize(self, data, var_name):
+    def denormalize(self, data, var_name, resolution):
         """
         Denormalize the input data for a specific variable using Min-Max denormalization.
 
@@ -141,7 +141,7 @@ class MinMaxNormalizatiton:
         if var_name=='orog':
             var_name ='z'
 
-        data_name = 'lr_'+var_name 
+        data_name = resolution+'_'+var_name 
         if data_name not in self.__variable_stats:
             raise ValueError(f"Variable {data_name} not found in variable stats. Make sure to normalize the data first.")
     

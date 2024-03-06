@@ -139,6 +139,7 @@ class DownscalingPipeline:
 
         # Normalize based on normalizer_type defined in constructor
         anomalies_lr_data, anomalies_hr_data = self.__normalizer.normalize_t2m(lr_data, hr_data)
+        # TODO: can be adjusted, only calc for lr add normalization
         anomalies_lr_lsm_z, anomalies_hr_lsm_orog = self.__normalizer.normalize_additional_features(lr_lsm_z, hr_lsm_orog, [['lsm','lsm'], ['z', 'orog']])
 
         self.__normalizer.store_stats_to_disk(stats_filename)
@@ -288,13 +289,13 @@ class DownscalingPipeline:
 
         if additional_features:
             prediction_norm_array= predictions_to_xarray_additional_features(lr_data, predictions_normalized, ['t2m', 'lsm', 'orog'])
-            return  self.denormalize(data = prediction_norm_array, stats_filename=stats_file, additional_features=True)
+            return  self.denormalize(data = prediction_norm_array, stats_filename=stats_file, additional_features=True, resolution='lr')
         else:
             prediction_norm_array = predictions_to_xarray_t2m(lr_data, predictions_normalized)
-            return self.denormalize(data = prediction_norm_array, stats_filename=stats_file)
+            return self.denormalize(data = prediction_norm_array, stats_filename=stats_file, resolution='lr')
     
 
-    def denormalize(self, data, stats_filename='', is_transformed=False, additional_features=False):
+    def denormalize(self, data, resolution, stats_filename='', is_transformed=False, additional_features=False):
         """
         Denormalize the normalized input data.
 
@@ -318,10 +319,10 @@ class DownscalingPipeline:
         self.__normalizer.load_stats_from_disk(stats_filename)
 
         if additional_features: 
-            denormalized_data['lsm']= self.__normalizer.denormalize(data['lsm'], 'lsm')
-            denormalized_data['orog']= self.__normalizer.denormalize(data['orog'], 'orog') 
+            denormalized_data['lsm']= self.__normalizer.denormalize(data['lsm'], 'lsm', resolution)
+            denormalized_data['orog']= self.__normalizer.denormalize(data['orog'], 'orog', resolution) 
 
-        denormalized_data['t2m'] = self.__normalizer.denormalize(data['t2m'], 't2m')
+        denormalized_data['t2m'] = self.__normalizer.denormalize(data['t2m'], 't2m', resolution)
 
         if is_transformed:
             detransformed_t2m = pd.DataFrame(self.transformer.inverse_transform(denormalized_data['t2m'].values.reshape(-1,1)))

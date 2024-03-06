@@ -44,8 +44,8 @@ class StandardizedAnomalies:
         tuple of xr.Dataset
             Tuple containing the normalized low-resolution and high-resolution datasets for temperature using standardized anomalies.
         """
-        normalized_lr = self.__normalize(lr_data, 't2m', 'lr_t2m', dim=['time'])
-        normalized_hr = self.__normalize(hr_data, 't2m', 'hr_t2m', dim=['time'])
+        normalized_lr = self.__normalize(data=lr_data, var_name='t2m', data_name='lr_t2m', dim=['time'])
+        normalized_hr = self.__normalize(data=hr_data, var_name='t2m', data_name='hr_t2m', dim=['time'])
         return normalized_lr, normalized_hr
     
 
@@ -68,8 +68,8 @@ class StandardizedAnomalies:
             Tuple containing the normalized low-resolution and high-resolution datasets for additional features using standardized anomalies.
         """
         for var_name in var_names:
-            lr_data = self.__normalize(lr_data, var_name[0], 'lr_'+var_name[0], dim=['time', 'longitude', 'latitude'])
-            hr_data = self.__normalize(hr_data, var_name[1], 'hr_'+var_name[1])
+            lr_data = self.__normalize(data=lr_data, var_name=var_name[0], data_name='lr_'+var_name[0], dim=['time', 'longitude', 'latitude'])
+            hr_data = self.__normalize(data=hr_data, var_name=var_name[1], data_name='hr_'+var_name[1], dim=['time', 'longitude', 'latitude'])
 
         return lr_data, hr_data
     
@@ -150,7 +150,7 @@ class StandardizedAnomalies:
         return (data - mu)/sigma
         
 
-    def denormalize(self, anomalies, var_name):
+    def denormalize(self, anomalies, var_name, resolution):
         """
         Denormalize anomalies to obtain predicted data using climatology statistics.
 
@@ -166,7 +166,8 @@ class StandardizedAnomalies:
         xarray.Dataset
             Predicted data obtained by denormalizing anomalies.
         """
-        data_name = 'lr_'+var_name 
+        data_name = resolution+'_'+var_name 
+
 
         if data_name not in self.__variable_stats:
             raise ValueError(f"Variable {data_name} not found in variable stats. Make sure to normalize the data first.")
