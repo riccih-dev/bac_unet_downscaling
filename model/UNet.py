@@ -1,7 +1,7 @@
 # -------------- IMPORTS --------------
 import tensorflow as tf
 from keras.layers import (Activation, BatchNormalization, Concatenate, Conv2D,
-                          Conv2DTranspose, Input, MaxPool2D)
+                          Conv2DTranspose, Input, MaxPool2D, Cropping2D)
 from keras.models import Model
 from keras.regularizers import l2
 
@@ -32,7 +32,7 @@ class UNetModel:
         bridge_features = self.__conv_block(downsampled_input, filters[4])
 
         # Decoder - reconstruct HR from the learned features of Encoder
-        decoder_conv = self.__decode(encoder_features=encoder_feature_maps, bridge_features=bridge_features, filters=filters, num_blocks=num_blocks)
+        decoder_conv = self.__decode(encoder_features=encoder_feature_maps, conv=bridge_features, filters=filters, num_blocks=num_blocks)
 
 
         if additional_features: 
@@ -42,7 +42,7 @@ class UNetModel:
 
             model = Model(inputs, [output_temp, output_lsm, output_orog], name="t2m_downscaling_unet_with_z")
         else: 
-            outputs = Conv2D(1, (1, 1), activation='tanh')(decoder_conv)
+            outputs = Conv2D(1, (1, 1), activation='linear')(decoder_conv)
             model = Model(inputs, outputs, name="downscaling_t2m_UNet")
 
         return model
@@ -71,20 +71,24 @@ class UNetModel:
 
         # generate multiple Encoder blocks (at least 3)
         for i in range(num_blocks):
-
             # each block consists of at least two convolutional layers and a Max Pooling Step 
             # Conv Layer - caputes pattern and relationsships in the spatial and temporal data (extracts features)
-            for _ in range(num_conv_layers):
-                x = self.__conv_block(x, filters[i])
-            
+            #for _ in range(num_conv_layers):
+            #    x = self.__conv_block(x, filters[i])
+
+            for j in range(num_conv_layers):
+              use_batch = j < num_conv_layers - 1
+              x = self.__conv_block(x, filters[i], use_batch_normalization=use_batch)
+
             feature_maps.append(x)
             # MaxPooling - reduces spatial dimension in the data 
             downsampled_input = MaxPool2D(pool_size)(x)
+            x  = downsampled_input
 
         return feature_maps, downsampled_input
     
     
-    def __decode(self, encoder_features:list, bridge_features, filters: list, num_blocks: int = 3 , num_conv_layers: int = 2,
+    def __decode(self, encoder_features:list, conv, filters: list, num_blocks: int = 3 , num_conv_layers: int = 2,
                  kernel_size: tuple = (3,3), pool_size: tuple =(2,2), padding: str = 'same'):
         """
         Decode the downsampled input and concatenate with encoder features.
@@ -104,21 +108,24 @@ class UNetModel:
         ----------
         - Keras Tensor: The decoded tensor after the final convolutional layers.
         """
-        conv = None
         filters.reverse()
         encoder_features.reverse()
 
 
         for i in range(num_blocks): 
             # Upsampling or Transpose Convolution - increases the spatial resolution of the feature maps 
-            deconv = Conv2DTranspose(filters[i+1], kernel_size = kernel_size , strides = (2,2), padding = padding)(bridge_features)      
+            conv = Conv2DTranspose(filters[i+1], kernel_size = kernel_size , strides = (2,2), padding = padding)(conv)   
             
             # Skip Connections - conncets correpsonding encoder and decoder layer - to obtain spatial information
-            conv = Concatenate(axis=3)([deconv, encoder_features[i]])
+            conv = Concatenate(axis=3)([conv, encoder_features[i]])
             
             # there are at least two convolutional Layers - these capture fine grained features
-            for _ in range(num_conv_layers):
-                conv = self.__conv_block(conv, filters[i+1])
+            #for _ in range(num_conv_layers):
+            #    conv = self.__conv_block(conv, filters[i+1])
+
+            for j in range(num_conv_layers):
+              use_batch = j < num_conv_layers - 1
+              conv = self.__conv_block(conv, filters[i+1], use_batch_normalization=use_batch)
 
         return conv
 

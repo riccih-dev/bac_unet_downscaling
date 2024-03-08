@@ -140,13 +140,13 @@ class DownscalingPipeline:
         # Normalize based on normalizer_type defined in constructor
         anomalies_lr_data, anomalies_hr_data = self.__normalizer.normalize_t2m(lr_data, hr_data)
         # TODO: can be adjusted, only calc for lr add normalization
-        anomalies_lr_lsm_z, anomalies_hr_lsm_orog = self.__normalizer.normalize_additional_features(lr_lsm_z, hr_lsm_orog, [['lsm','lsm'], ['z', 'orog']])
+        #anomalies_lr_lsm_z, anomalies_hr_lsm_orog = self.__normalizer.normalize_additional_features(lr_lsm_z, hr_lsm_orog, [['lsm','lsm'], ['z', 'orog']])
 
         self.__normalizer.store_stats_to_disk(stats_filename)
 
-        combined_anomalies_lr_data = combine_data(anomalies_lr_data, anomalies_lr_lsm_z, ['lsm', 'z'])
+        #combined_anomalies_lr_data = combine_data(anomalies_lr_data, anomalies_lr_lsm_z, ['lsm', 'z'])
         
-        return combined_anomalies_lr_data, anomalies_hr_data
+        return anomalies_lr_data, anomalies_hr_data
     
 
     def transform(self, data, feature='t2m', handle_outlier = False, print_info = False):  

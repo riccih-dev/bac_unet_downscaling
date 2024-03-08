@@ -111,6 +111,8 @@ class StandardizedAnomalies:
         # Update the original datasets with the normalized values
         normalized_data[var_name] = normalized_variable
 
+        print(self.__variable_stats)
+
         return normalized_data
 
 

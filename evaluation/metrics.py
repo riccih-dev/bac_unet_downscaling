@@ -14,13 +14,13 @@ class DownscalingMetrics:
         """Calculate all metrics"""        
         rmse = self.__calculate_rmse()
         mae = self.__calculate_mae()
-        max_error = self.__calculate_max_error()
+        max_err = self.__calculate_max_error()
         bias = self.__calculate_bias()
         
         metrics_dict = {
             'RMSE': [rmse],
             'MAE': [mae],
-            'Max Error': [max_error],
+            'Max Error': [max_err],
             'Bias': [bias]
         }
 

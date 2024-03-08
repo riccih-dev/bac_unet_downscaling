@@ -3,6 +3,8 @@ __pycache__/
 
 # Ignore data folders
 data/
+data_split/
+preprocessed_data/
 
 # Ignore .vscode folder
 .vscode/

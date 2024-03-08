@@ -9,7 +9,7 @@ from scipy.stats.mstats import winsorize
 Utility functions for Preprocessing-Step
 '''
 
-def crop_spatial_dimension(data, crop_region=None, divisible_factor=2):
+def crop_spatial_dimension(data, crop_region=None, divisible_factor=32):
     """
     Crops the given xarray dataset based on a specified region and ensures spatial dimensions are divisible by a specified factor.
 
