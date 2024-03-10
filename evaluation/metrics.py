@@ -1,3 +1,4 @@
+from audioop import rms
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_squared_error,mean_absolute_error,max_error
@@ -17,6 +18,9 @@ class DownscalingMetrics:
         max_err = self.__calculate_max_error()
         bias = self.__calculate_bias()
         
+        self.__rmse_percentage_range(rmse)
+        self.__mae_percentage_range(mae)
+
         metrics_dict = {
             'RMSE': [rmse],
             'MAE': [mae],
@@ -26,12 +30,48 @@ class DownscalingMetrics:
 
         return metrics_dict
 
+    def __rmse_percentage_range(self,rmse):
+        true_range = np.ptp(self.y_true )
+        percentage_true_rmse = (rmse / true_range) * 100
+
+        pred_range = np.ptp(self.y_pred)
+        percentage_rmse_pred = (rmse / pred_range) * 100
+
+        print('--- true: ---')
+        print('min', np.min(self.y_true))
+        print('max', np.max(self.y_true))
+        print('range true:', true_range)
+        print("rmse % true: ",percentage_true_rmse)
+
+
+        print('--- pred: ---')
+        print('min', np.min(self.y_pred))
+        print('max', np.max(self.y_pred))
+        print('range pred', pred_range) 
+        print("rmse % pred: ",percentage_rmse_pred)
+
+
+    def __mae_percentage_range(self,mae):
+        true_range = np.ptp(self.y_true )
+        percentage_true_mae = (mae / true_range) * 100
+
+        pred_range = np.ptp(self.y_pred)
+        percentage_mae_pred = (mae / pred_range) * 100
+        
+        print('---------')
+        print("mae % true: ",percentage_true_mae)
+        print("mae % pred: ",percentage_mae_pred)
+
+
 
     def __calculate_rmse(self):
         """
         Calculate Root Mean Squared Error (RMSE).
         Measures the average magnitude of the errors between predicted and actual values.
         """
+        o = np.sqrt(np.mean((self.y_true - self.y_pred)) ** 2)
+        f = np.sqrt(mean_squared_error(self.y_true, self.y_pred))
+
         return np.sqrt(mean_squared_error(self.y_true, self.y_pred))
 
 

@@ -1,28 +1,26 @@
-# -------------- IMPORTS --------------
-import tensorflow as tf
 from keras.layers import (Activation, BatchNormalization, Concatenate, Conv2D,
-                          Conv2DTranspose, Input, MaxPool2D, Cropping2D)
+                          Conv2DTranspose, Input, MaxPool2D)
 from keras.models import Model
 from keras.regularizers import l2
+from torch import tensor
 
 class UNetModel:
-    """Create and train a UNet model for downscaling."""
+    """Creation of UNet model for downscaling."""
 
-    def create_model(self, input_shape, filters, additional_features=False):
+    def create_model(self, input_shape, filters):
         """
         Create the UNet model architecture.
 
         Parameters:
         ----------
-        - input_shape: Tuple, shape of the input data 
+        - input_shape: Tuple[int], shape of the input data 
+        - filters: List[int], the number of filters (channels) for each block
 
         Returns:
         ----------
         - Keras Model: The UNet model for downscaling temperature.
         """
         num_blocks = 4
-
-        #input tensor to the entire U-Net model.
         inputs = Input(input_shape)
 
         # Encoder - Extracting hierarchical features from the LR-Data (ERA5)
@@ -33,17 +31,9 @@ class UNetModel:
 
         # Decoder - reconstruct HR from the learned features of Encoder
         decoder_conv = self.__decode(encoder_features=encoder_feature_maps, conv=bridge_features, filters=filters, num_blocks=num_blocks)
-
-
-        if additional_features: 
-            output_temp = Conv2D(1, (1,1), activation='tanh', kernel_initializer="he_normal", name="output_temp")(decoder_conv)
-            output_orog = Conv2D(1, (1, 1), activation='tanh', kernel_initializer="he_normal", name="output_orog")(decoder_conv)
-            output_lsm = Conv2D(1, (1, 1), activation='tanh', kernel_initializer="he_normal", name="output_lsm")(decoder_conv)
-
-            model = Model(inputs, [output_temp, output_lsm, output_orog], name="t2m_downscaling_unet_with_z")
-        else: 
-            outputs = Conv2D(1, (1, 1), activation='linear')(decoder_conv)
-            model = Model(inputs, outputs, name="downscaling_t2m_UNet")
+        
+        outputs = Conv2D(1, (1, 1), activation='linear')(decoder_conv)
+        model = Model(inputs, outputs, name="downscaling_t2m_UNet")
 
         return model
     
@@ -55,32 +45,29 @@ class UNetModel:
         Parameters:
         ----------
         - x: Input tensor
-        - filters: List with the number of filters (channels) for each block
-        - num_blocks: Number of encoder blocks
-        - num_conv_layers: Number of convolutional layers per block
-        - pool_size: Tuple, size of the pooling window
+        - filters: List[int], the number of filters (channels) for each block
+        - num_blocks: Int, number of encoder blocks
+        - num_conv_layers: Int, number of convolutional layers per block
+        - pool_size: Tuple[int], size of the pooling window
 
         Returns:
         ----------
         - Tuple: List of feature maps from each block and the downsampled input tensor.
         """
-
         # List to store feature maps of each block (later used in decoder)
         feature_maps = []
         downsampled_input = None
 
-        # generate multiple Encoder blocks (at least 3)
+        # Generate multiple Encoder blocks
         for i in range(num_blocks):
             # each block consists of at least two convolutional layers and a Max Pooling Step 
             # Conv Layer - caputes pattern and relationsships in the spatial and temporal data (extracts features)
-            #for _ in range(num_conv_layers):
-            #    x = self.__conv_block(x, filters[i])
-
             for j in range(num_conv_layers):
               use_batch = j < num_conv_layers - 1
               x = self.__conv_block(x, filters[i], use_batch_normalization=use_batch)
 
             feature_maps.append(x)
+
             # MaxPooling - reduces spatial dimension in the data 
             downsampled_input = MaxPool2D(pool_size)(x)
             x  = downsampled_input
@@ -89,20 +76,19 @@ class UNetModel:
     
     
     def __decode(self, encoder_features:list, conv, filters: list, num_blocks: int = 3 , num_conv_layers: int = 2,
-                 kernel_size: tuple = (3,3), pool_size: tuple =(2,2), padding: str = 'same'):
+                 kernel_size: tuple = (3,3), padding: str = 'same'):
         """
         Decode the downsampled input and concatenate with encoder features.
 
         Parameters:
         ----------
-        - encoder_convs: List of feature maps from encoder blocks
-        - downsampled_input: Downsampled input tensor of the bridge
-        - filters: List with the number of filters (channels) for each block
-        - num_blocks: Number of decoder blocks
-        - num_conv_layers: Number of convolutional layers per block
-        - kernel_size: Tuple, size of the convolutional kernel
-        - pool_size: Tuple, size of transpose stride, expected to tbe same as in encoder
-        - padding: Padding strategy for Conv2DTranspose
+        - encoder_features: List of feature maps from encoder blocks
+        - conv: Downsampled input tensor of the bridge
+        - filters: List[int], the number of filters (channels) for each block
+        - num_blocks: Int, number of decoder blocks
+        - num_conv_layers: Int, number of convolutional layers per block
+        - kernel_size: Tuple[int], size of the convolutional kernel
+        - padding: Str, padding strategy for Conv2DTranspose
 
         Returns:
         ----------
@@ -111,17 +97,12 @@ class UNetModel:
         filters.reverse()
         encoder_features.reverse()
 
-
         for i in range(num_blocks): 
             # Upsampling or Transpose Convolution - increases the spatial resolution of the feature maps 
             conv = Conv2DTranspose(filters[i+1], kernel_size = kernel_size , strides = (2,2), padding = padding)(conv)   
             
             # Skip Connections - conncets correpsonding encoder and decoder layer - to obtain spatial information
             conv = Concatenate(axis=3)([conv, encoder_features[i]])
-            
-            # there are at least two convolutional Layers - these capture fine grained features
-            #for _ in range(num_conv_layers):
-            #    conv = self.__conv_block(conv, filters[i+1])
 
             for j in range(num_conv_layers):
               use_batch = j < num_conv_layers - 1
@@ -139,12 +120,12 @@ class UNetModel:
         Parameters:
         ----------
         - conv: Input tensor
-        - num_filters: Number of filters (channels) for the convolutional layer
-        - kernel_size: Tuple, size of the convolutional kernel
-        - activation: Activation function
-        - padding: Padding strategy for Conv2D
-        - kernel_initializer: Initialization method for kernel weights
-        - use_batch_normalization: Whether to use batch normalization
+        - num_filters: Int, number of filters (channels) for the convolutional layer
+        - kernel_size: Tuple[int], size of the convolutional kernel
+        - activation: Str, activation function
+        - padding: Str, padding strategy for Conv2D
+        - kernel_initializer: Str, initialization method for kernel weights
+        - use_batch_normalization: Bool, whether to use batch normalization
 
         Returns:
         ----------

@@ -9,4 +9,7 @@ preprocessed_data/
 # Ignore .vscode folder
 .vscode/
 
-results
+preprocessed_data/
+results/
+plot/
+Pics_thesis/

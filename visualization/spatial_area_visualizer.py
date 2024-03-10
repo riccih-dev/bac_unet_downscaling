@@ -8,6 +8,9 @@ class SpatialVisualizer:
         self.dataset = dataset
 
     def visualize_spatial_area(self):
+        """
+        Visualize the spatial area defined by the latitude and longitude values in the dataset.
+        """
         lon = self.dataset.longitude.values
         lat = self.dataset.latitude.values
         
@@ -16,33 +19,32 @@ class SpatialVisualizer:
                     llcrnrlat=lat.min(), urcrnrlat=lat.max(),
                     llcrnrlon=lon.min(), urcrnrlon=lon.max())
         
-        self.draw_map(m)
-        
-        # Show the plot
-        #plt.title('Spatial Area Visualization')
+        self.__draw_map(m)
         plt.show()
 
-    def draw_map(self, m, scale=1):
-        # draw a shaded-relief image
-        m.shadedrelief(scale=scale)
+    def __draw_map(self, m, scale=1):
+        """
+        Draw a map with shaded relief, country borders, and grid lines.
 
-        # Draw country borders
+        Parameters:
+        ----------
+        - m: mpl_toolkits.basemap.Basemap
+            The Basemap instance for drawing the map.
+        - scale: float, optional
+            Scale factor for the shaded-relief image. Default is 1.
+        """
+        m.shadedrelief(scale=scale)
         m.drawcountries(linewidth=0.7, linestyle='solid', color='brown')
         
-        # Specify the number of lines you want
-        num_lines = 100  # Adjust this based on your preference
-
-        # lats and longs are returned as a dictionary
+        # Draw latitude and longitude lines on the map
+        num_lines = 100 
         lats = m.drawparallels(np.linspace(self.dataset.latitude.min(), self.dataset.latitude.max(), num_lines))
         lons = m.drawmeridians(np.linspace(self.dataset.longitude.min(), self.dataset.longitude.max(), num_lines))
 
-
-        # keys contain the plt.Line2D instances
         lat_lines = chain(*(tup[1][0] for tup in lats.items()))
         lon_lines = chain(*(tup[1][0] for tup in lons.items()))
         all_lines = chain(lat_lines, lon_lines)
         
-        # cycle through these lines and set the desired style
         for line in all_lines:
             line.set(linestyle='-', alpha=0.05, color='w')
 
