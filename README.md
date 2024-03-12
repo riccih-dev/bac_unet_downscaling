@@ -42,7 +42,7 @@ Scripts related to data visualization and presentation:
 ### `experiments`
 Jupyter notebooks documenting experiments conducted with different datasets and data processing techniques, including experiments spanning 4 years and 10 years.
 
-### Data Directory
+### `data`
 Please note that the data associated with this project is not stored within this GitHub repository due to its size. Instead, the data will be loaded and pre-processed dynamically within the Jupyter Notebook scripts provided. 
 
 ## Requirements
