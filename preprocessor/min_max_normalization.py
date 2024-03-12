@@ -51,29 +51,29 @@ class MinMaxNormalizatiton:
         return normalized_lr, normalized_hr
 
 
-    def normalize_additional_features(self, lr_data, hr_data, var_names):    
+    
+    def normalize_additional_features(self, data, var_names, data_source='lr_'):    
         """
-        Normalize the input low-resolution (lr_data) and high-resolution (hr_data) datasets for additional features using Min-Max normalization.
+        Normalize the input data for additional features using Min-Max normalization.
 
         Parameters:
         -----------
-        lr_data : xr.Dataset
-            Low-resolution observed data.
-        hr_data : xr.Dataset
-            High-resolution observed data.
+        data : xr.Dataset
+            Input dataset containing the variables to be normalized.
         var_names : list of str
             Names of the variables to be normalized.
+        data_source : str, optional
+            Prefix to be added to the normalized variable names. Default is 'lr_'.
 
         Returns:
         --------
-        tuple of xr.Dataset
-            Tuple containing the normalized low-resolution and high-resolution datasets for additional features using Min-Max normalization.
+        xr.Dataset
+            Normalized dataset for additional features using Min-Max normalization.
         """
         for var_name in var_names:
-            lr_data = self.__normalize(lr_data, var_name[0], 'lr_'+var_name[0])
-            hr_data = self.__normalize(hr_data, var_name[1], 'hr_'+var_name[1])
+            data = self.__normalize(data, var_name, data_source+var_name)
 
-        return lr_data, hr_data
+        return data
     
 
     def reset_variable_stats(self):

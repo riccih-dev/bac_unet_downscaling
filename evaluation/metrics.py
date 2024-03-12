@@ -1,77 +1,70 @@
-from audioop import rms
 import numpy as np
-import pandas as pd
-from sklearn.metrics import mean_squared_error,mean_absolute_error,max_error
+from sklearn.metrics import mean_squared_error,mean_absolute_error
+import json
+import os
 
 class DownscalingMetrics:
     """Calculate evaluation metrics for model performance."""
 
     def __init__(self, y_true, y_pred):
+        """
+        Initialize the DownscalingMetrics class.
+
+        Parameters:
+            y_true (numpy.ndarray): Array containing the true values.
+            y_pred (numpy.ndarray): Array containing the predicted values.
+        """
         # flattening is performed to make it easier to calculate metrics for multidimensional array
         self.y_true = y_true.reshape(-1)
         self.y_pred = y_pred.reshape(-1)
 
     def calculate_metrics(self): 
-        """Calculate all metrics"""        
+        """
+        Calculate evaluation metrics including RMSE, MAE, and their percentages in relation to the true value intervals.
+
+        Returns:
+            dict: Dictionary containing evaluation metrics including RMSE, MAE, and their percentages in relation to true values.
+        """           
         rmse = self.__calculate_rmse()
+        percentage_rmse = (rmse / np.ptp(self.y_true)) * 100
+
         mae = self.__calculate_mae()
-        max_err = self.__calculate_max_error()
-        bias = self.__calculate_bias()
-        
-        self.__rmse_percentage_range(rmse)
-        self.__mae_percentage_range(mae)
+        percentage_mae = (mae / np.ptp(self.y_true)) * 100
+
+        interval_true = self.__calculate_interval(self.y_true)
+        interval_pred = self.__calculate_interval(self.y_pred)
 
         metrics_dict = {
-            'RMSE': [rmse],
-            'MAE': [mae],
-            'Max Error': [max_err],
-            'Bias': [bias]
+            'true_values_interval': [str(interval_true[0]),str(interval_true[1])],
+            'predictions_interval': [str(interval_pred[0]),str(interval_pred[1])],
+            'rmse': [rmse],
+            'rmse_percentage_true': [percentage_rmse],
+            'mae': [mae],
+            'mae_percentage_true': [percentage_mae],
         }
 
+
         return metrics_dict
+    
 
-    def __rmse_percentage_range(self,rmse):
-        true_range = np.ptp(self.y_true )
-        percentage_true_rmse = (rmse / true_range) * 100
+    def __calculate_interval(self, data):
+        """
+        Calculate the interval of the given data.
 
-        pred_range = np.ptp(self.y_pred)
-        percentage_rmse_pred = (rmse / pred_range) * 100
+        Parameters:
+            data (numpy.ndarray): Array containing the data.
 
-        print('--- true: ---')
-        print('min', np.min(self.y_true))
-        print('max', np.max(self.y_true))
-        print('range true:', true_range)
-        print("rmse % true: ",percentage_true_rmse)
-
-
-        print('--- pred: ---')
-        print('min', np.min(self.y_pred))
-        print('max', np.max(self.y_pred))
-        print('range pred', pred_range) 
-        print("rmse % pred: ",percentage_rmse_pred)
-
-
-    def __mae_percentage_range(self,mae):
-        true_range = np.ptp(self.y_true )
-        percentage_true_mae = (mae / true_range) * 100
-
-        pred_range = np.ptp(self.y_pred)
-        percentage_mae_pred = (mae / pred_range) * 100
-        
-        print('---------')
-        print("mae % true: ",percentage_true_mae)
-        print("mae % pred: ",percentage_mae_pred)
-
-
+        Returns:
+            tuple: A tuple containing the minimum and maximum values of the data.
+        """
+        return np.min(data), np.max(data)
+    
 
     def __calculate_rmse(self):
         """
         Calculate Root Mean Squared Error (RMSE).
         Measures the average magnitude of the errors between predicted and actual values.
         """
-        o = np.sqrt(np.mean((self.y_true - self.y_pred)) ** 2)
-        f = np.sqrt(mean_squared_error(self.y_true, self.y_pred))
-
         return np.sqrt(mean_squared_error(self.y_true, self.y_pred))
 
 
@@ -82,18 +75,30 @@ class DownscalingMetrics:
         """
         return mean_absolute_error(self.y_true, self.y_pred)
 
+    def save_evaluation_summary(self, filename_suffix, model_setup, training_loss, validation_loss, metric_results, result_path):
+        filename = os.path.join(result_path, f'model_and_results_{filename_suffix}.json')
 
-    def __calculate_max_error(self):
-        """
-        Calculate the largest absolute difference between any predicted and actual values. 
-        Indicates the maximum error made by the model.
-        """
-        return max_error(self.y_true, self.y_pred)
+        # Convert float32 values to float64 for serialization
+        training_loss = [float(item) for item in training_loss]
+        validation_loss = [float(item) for item in validation_loss]
 
-    
-    def __calculate_bias(self):
-        """Calculate Bias."""
-        return np.mean(self.y_true - self.y_pred)
+        [float(item) for item in training_loss]
+
+        for key, value in metric_results.items():
+            metric_results[key] = [float(item) for item in value]
+
+        output_data = {
+            'model_setup': model_setup,
+            'training_history': {
+                'training_loss': training_loss,
+                'validation_loss': validation_loss
+            },
+            'evaluation_metrics': metric_results
+        }
+
+        with open(filename, 'w') as json_file:
+            json.dump(output_data, json_file, indent=4)
+
 
 
 

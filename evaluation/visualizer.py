@@ -1,24 +1,20 @@
 import matplotlib.pyplot as plt
 from cartopy import crs as ccrs, feature as cfeature
 import os
-from scipy.stats import probplot
-import numpy as np
 
 class EvaluationVisualization:
-    def __init__(self):
-        """
-        Initialize the DownscalingVisualization class.
-
-        Parameters:
-        - actual_data (numpy.ndarray): Actual high-resolution temperature data.
-        - predicted_data (numpy.ndarray): Predicted high-resolution temperature data.
-        """
-        #self.actual_data = actual_data
-        #self.predicted_data = predicted_data
-
     def show_training_history(self, history, filename_suffix, show_graph=True):
         """
         Display a plot of training and validation loss over epochs.
+
+        Parameters:
+        -----------
+        history : dict
+            Dictionary containing the training and validation loss over epochs.
+        filename_suffix : str
+            Suffix to be added to the filename for saving the plot.
+        show_graph : bool, optional
+            Whether to display the graph. Default is True.
         """
         # Obtain information from the history object
         training_loss = history['loss']
@@ -54,6 +50,10 @@ class EvaluationVisualization:
             Actual high-resolution temperature data.
         prediction : xarray.Dataset
             Predicted high-resolution temperature data.
+        filename_suffix : str
+            Suffix to be added to the filename for saving the plot.
+        show_graph : bool, optional
+            Whether to display the graph. Default is True.
         """
         # Calculate the mean along the time dimension
         y_mean = y.mean(dim='time')
@@ -88,7 +88,6 @@ class EvaluationVisualization:
         if show_graph:
             plt.show()
 
-
     def difference_maps(self, y, prediction,filename_suffix, show_graph=True):
         """
         Create maps showing the differences between predicted and actual values.
@@ -96,10 +95,14 @@ class EvaluationVisualization:
 
         Parameters:
         -----------
-        actual_data : xarray.Dataset
+        y : xarray.Dataset
             Actual high-resolution temperature data.
-        predicted_data : xarray.Dataset
+        prediction : xarray.Dataset
             Predicted high-resolution temperature data.
+        filename_suffix : str
+            Suffix to be added to the filename for saving the plot.
+        show_graph : bool, optional
+            Whether to display the graph. Default is True.
         """
         # Calculate the mean along the time dimension
         y_mean = y.mean(dim='time')
@@ -122,26 +125,30 @@ class EvaluationVisualization:
 
         plt.close()
 
-
-    def histograms(self, actual_data, predicted_data,filename_suffix='', var = 't2m', show_graph = True):
+    def comparison_histograms(self, true_data, predicted_data, filename_suffix='', var='t2m', show_graph=True):
         """
-        Plot histograms of predicted and actual temperature values
-        to understand the distribution and identify any biases.
+        Compare histograms of predicted and actual temperature values to understand the distribution and identify any biases.
 
         Parameters:
         -----------
-        actual_data : xarray.Dataset
+        true_data : xarray.Dataset
             Actual high-resolution temperature data.
         predicted_data : xarray.Dataset
             Predicted high-resolution temperature data.
+        filename_suffix : str, optional
+            Suffix to be added to the filename for saving the plot. Default is ''.
+        var : str, optional
+            Variable name for which histograms are plotted. Default is 't2m'.
+        show_graph : bool, optional
+            Whether to display the graph. Default is True.
         """
         # Extracting the temperature values for histograms
-        actual_values = actual_data[var].values.flatten()
+        true_values = true_data[var].values.flatten()
         predicted_values = predicted_data[var].values.flatten()
 
         # Create histograms
         plt.figure(figsize=(12, 6))
-        plt.hist(actual_values, bins=50, alpha=0.5, label=f'Actual {var} Data')
+        plt.hist(true_values, bins=50, alpha=0.5, label=f'Actual {var} Data')
         plt.hist(predicted_values, bins=50, alpha=0.5, label=f'Predicted {var} Data')
 
         # Add labels and legend
@@ -159,18 +166,20 @@ class EvaluationVisualization:
             
         plt.close()
 
-    # TODO: put into other class
-    def histograms_single_ds(self, data, var_name = 't2m'):
+    def plot_histogram(self, data, var_name = 't2m'):
         """
-        Plot histograms of predicted and actual temperature values
-        to understand the distribution and identify any biases.
+        Plot histograms of a single dataset's temperature values to understand the distribution and identify any biases.
 
         Parameters:
         -----------
-        actual_data : xarray.Dataset
-            Actual high-resolution temperature data.
-        predicted_data : xarray.Dataset
-            Predicted high-resolution temperature data.
+        data : xarray.Dataset
+            High-resolution temperature data.
+        var_name : str, optional
+            Variable name for which histograms are plotted. Default is 't2m'.
+        filename_suffix : str, optional
+            Suffix to be added to the filename for saving the plot. Default is ''.
+        show_graph : bool, optional
+            Whether to display the graph. Default is True.
         """
         data = data[var_name].values.flatten()
 
@@ -185,40 +194,8 @@ class EvaluationVisualization:
         plt.legend()
             
         plt.show()
-            
         plt.close()
 
-
-
-
-    # TODO: put into other class
-    def qq_plot(self, data, distribution='norm', line='45', var_name='t2m'):
-        """
-        Create a Q-Q plot for the given data.
-
-        Parameters:
-        - data: 1D array-like, the data to be plotted.
-        - distribution: str, optional, the theoretical distribution to compare against (default is 'norm').
-        - line: {'45', 's', 'r'}, optional, type of Q-Q plot to draw (default is '45').
-        - var_name: str, optional, variable name for labeling the plot (default is 'Variable').
-        """
-        fig, ax = plt.subplots()
-        probplot(data[var_name].values.flatten(), dist=distribution, plot=ax)
-        ax.set_title(f'Q-Q Plot for {var_name}')
-        ax.set_xlabel('Theoretical Quantiles')
-        ax.set_ylabel('Sample Quantiles')
-
-        if line == '45':
-            ax.plot(ax.get_xlim(), ax.get_xlim(), linestyle='--', color='red', label='45-degree line')
-        elif line == 's':
-            sorted_data = np.sort(data)
-            ax.plot(sorted_data, sorted_data, linestyle='--', color='red', label='Sorted line')
-        elif line == 'r':
-            residuals = np.sort(data - np.mean(data))
-            ax.plot(residuals, residuals, linestyle='--', color='red', label='Residuals line')
-
-        ax.legend()
-        plt.show()
 
 
 

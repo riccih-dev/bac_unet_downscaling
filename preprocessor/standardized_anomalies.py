@@ -49,29 +49,28 @@ class StandardizedAnomalies:
         return normalized_lr, normalized_hr
     
 
-    def normalize_additional_features(self, lr_data, hr_data, var_names):
+    def normalize_additional_features(self, data, var_names, data_source='lr_'):    
         """
         Normalize the input low-resolution and high-resolution datasets for additional features using standardized anomalies.
 
         Parameters:
         -----------
-        lr_data : xr.Dataset
-            Low-resolution observed data.
-        hr_data : xr.Dataset
-            High-resolution observed data.
+        data : xr.Dataset
+            Input dataset containing the variables to be normalized.
         var_names : list of str
             Names of the variables to be normalized.
+        data_source : str, optional
+            Prefix to be added to the normalized variable names. Default is 'lr_'.
 
         Returns:
         --------
-        tuple of xr.Dataset
-            Tuple containing the normalized low-resolution and high-resolution datasets for additional features using standardized anomalies.
+        xr.Dataset
+            Normalized dataset for additional features using Standardized Anomalies.
         """
         for var_name in var_names:
-            lr_data = self.__normalize(data=lr_data, var_name=var_name[0], data_name='lr_'+var_name[0], dim=['time', 'longitude', 'latitude'])
-            hr_data = self.__normalize(data=hr_data, var_name=var_name[1], data_name='hr_'+var_name[1], dim=['time', 'longitude', 'latitude'])
+            data = self.__normalize(data=data, var_name=var_name, data_name=data_source+var_name, dim=['time', 'longitude', 'latitude'])
 
-        return lr_data, hr_data
+        return data
     
 
     def reset_variable_stats(self):

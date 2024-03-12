@@ -1,15 +1,5 @@
-# Ignore __pycache__ folders
 __pycache__/
-
-# Ignore data folders
-data/
-data_split/
-preprocessed_data/
-
-# Ignore .vscode folder
 .vscode/
-
-preprocessed_data/
+data/
 results/
-plot/
-Pics_thesis/
+first_steps/

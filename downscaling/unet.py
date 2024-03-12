@@ -2,7 +2,6 @@ from keras.layers import (Activation, BatchNormalization, Concatenate, Conv2D,
                           Conv2DTranspose, Input, MaxPool2D)
 from keras.models import Model
 from keras.regularizers import l2
-from torch import tensor
 
 class UNetModel:
     """Creation of UNet model for downscaling."""
@@ -27,6 +26,7 @@ class UNetModel:
         encoder_feature_maps, downsampled_input = self.__encode(inputs,filters, num_blocks)
 
         # Bridge between Encoder and Decoder
+        bridge_features = self.__conv_block(downsampled_input, filters[4])
         bridge_features = self.__conv_block(downsampled_input, filters[4])
 
         # Decoder - reconstruct HR from the learned features of Encoder
