@@ -160,6 +160,9 @@ class DownscalingPipeline:
         lr_data = pad_lr_to_match_hr(hr_data, lr_data)
         lr_lsm_z = pad_lr_to_match_hr(hr_lsm_orog, lr_lsm_z)
 
+        lr_data = lr_data.sortby('latitude', ascending = False)
+        hr_data = hr_data.sortby('latitude', ascending = False)
+
         # Normalize based on normalizer_type defined in constructor
         anomalies_lr_data, anomalies_hr_data = self.__normalizer.normalize_t2m(lr_data, hr_data)
         anomalies_lr_lsm_z = self.__normalizer.normalize_additional_features(lr_lsm_z, ['lsm','lsm'])
