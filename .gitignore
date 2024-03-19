@@ -1,5 +1,7 @@
 __pycache__/
 .vscode/
 exploring
-data/
+data/climate_data/
+data/data_split/
+data/preprocessed_data/
 results/
