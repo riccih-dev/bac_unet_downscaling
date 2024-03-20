@@ -31,7 +31,7 @@ class UNetModelConfiguration:
             List containing LearningRateScheduler and EarlyStopping callbacks.
         """
         lr_scheduler_callback = tf.keras.callbacks.LearningRateScheduler(lambda epoch, lr: self._lr_scheduler(epoch, lr, scheduler_type))
-        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
         
         return [lr_scheduler_callback, early_stopping]
     

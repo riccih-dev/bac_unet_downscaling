@@ -44,8 +44,8 @@ class StandardizedAnomalies:
         tuple of xr.Dataset
             Tuple containing the normalized low-resolution and high-resolution datasets for temperature using standardized anomalies.
         """
-        normalized_lr = self.__normalize(data=lr_data, var_name='t2m', data_name='lr_t2m', dim=['time'])
-        normalized_hr = self.__normalize(data=hr_data, var_name='t2m', data_name='hr_t2m', dim=['time'])
+        normalized_lr = self.__normalize(data=lr_data, var_name='t2m', data_name='lr_t2m', dim=['time', 'longitude', 'latitude'])
+        normalized_hr = self.__normalize(data=hr_data, var_name='t2m', data_name='hr_t2m', dim=['time', 'longitude', 'latitude'])
         return normalized_lr, normalized_hr
     
 

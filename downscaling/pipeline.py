@@ -162,16 +162,18 @@ class DownscalingPipeline:
 
         lr_data = lr_data.sortby('latitude', ascending = False)
         hr_data = hr_data.sortby('latitude', ascending = False)
+        lr_lsm_z = lr_lsm_z.sortby('latitude', ascending = False)
+        hr_lsm_orog = hr_lsm_orog.sortby('latitude', ascending = False)
 
         # Normalize based on normalizer_type defined in constructor
         anomalies_lr_data, anomalies_hr_data = self.__normalizer.normalize_t2m(lr_data, hr_data)
-        anomalies_lr_lsm_z = self.__normalizer.normalize_additional_features(lr_lsm_z, ['lsm','lsm'])
+        anomalies_lr_lsm_z = self.__normalizer.normalize_additional_features(lr_lsm_z, ['lsm','z'])
         combined_anomalies_lr_data = combine_data(anomalies_lr_data, anomalies_lr_lsm_z, ['lsm', 'z'])
 
         self.__normalizer.store_stats_to_disk(stats_filename)
 
         return combined_anomalies_lr_data, anomalies_hr_data
-    
+
     def fit_model(self, train_generator, val_generator, scheduler_type, learning_rate_value, filters, loss_type='mae', num_epochs=50, batch_size=16, show_summary=False):
         """
         Fit the U-Net model with training data generator and validate using validation data generator.

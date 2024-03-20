@@ -27,7 +27,6 @@ class UNetModel:
 
         # Bridge between Encoder and Decoder
         bridge_features = self.__conv_block(downsampled_input, filters[4])
-        bridge_features = self.__conv_block(downsampled_input, filters[4])
 
         # Decoder - reconstruct HR from the learned features of Encoder
         decoder_conv = self.__decode(encoder_features=encoder_feature_maps, conv=bridge_features, filters=filters, num_blocks=num_blocks)
