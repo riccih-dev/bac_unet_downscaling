@@ -1,6 +1,7 @@
 __pycache__/
 .ipynb_checkpoints/
 .vscode/
+NOTES_TODO_local.md
 exploring
 data/climate_data/
 data/data_split/

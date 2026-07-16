@@ -6,6 +6,37 @@ This repository contains the implementation for my bachelor's thesis project, fo
 
 The objective of this research is to implement a downscaling technique that utilizes the power of U-Net, a convolutional neural network model known for its effectiveness in image segmentation, and leverages standardized anomalies to enhance the downscaling process.
 
+## Architecture
+
+The model is a standard U-Net encoder-decoder: 4 encoder blocks (each with two convolutional layers followed by max pooling) reduce the spatial resolution while extracting features from the low-resolution ERA5 input; a bridge block connects encoder and decoder; 4 decoder blocks upsample back to the target resolution via transposed convolutions, each concatenated with the matching encoder block's feature map through a skip connection so fine spatial detail from the input isn't lost during downsampling.
+
+```mermaid
+flowchart TD
+    IN["Input: LR ERA5 t2m + lsm/z"] --> E1
+
+    subgraph Encoder
+        E1["Encoder Block 1"] --> E2["Encoder Block 2"]
+        E2 --> E3["Encoder Block 3"]
+        E3 --> E4["Encoder Block 4"]
+    end
+
+    E4 --> BR["Bridge"]
+
+    subgraph Decoder
+        BR --> D1["Decoder Block 1"]
+        D1 --> D2["Decoder Block 2"]
+        D2 --> D3["Decoder Block 3"]
+        D3 --> D4["Decoder Block 4"]
+    end
+
+    E4 -. skip connection .-> D1
+    E3 -. skip connection .-> D2
+    E2 -. skip connection .-> D3
+    E1 -. skip connection .-> D4
+
+    D4 --> OUT["Output: 1x1 Conv -> HR t2m prediction"]
+```
+
 ## Repository Structure
 
 The repository is organized into several main directories, each serving a specific purpose:
@@ -44,6 +75,26 @@ Jupyter notebooks documenting experiments conducted with different datasets and 
 
 ### `data`
 Please note that the data associated with this project is not stored within this GitHub repository due to its size. Instead, the data will be loaded and pre-processed dynamically within the Jupyter Notebook scripts provided. 
+
+## Results
+
+Best result so far, using standardized anomalies normalization on the 4-year, spatially cropped dataset:
+
+| Setting | Value |
+|---|---|
+| Normalization | Standardized anomalies |
+| Filters | 896 → 448 → 224 → 112 → 56 |
+| Activation | tanh |
+| Loss | Huber loss |
+| LR scheduler | Time decay |
+| Epochs / Batch size | 15 / 4 |
+
+| Metric | Value |
+|---|---|
+| RMSE | 8.55 K (14.60% of true value range) |
+| MAE | 7.19 K (12.28% of true value range) |
+
+Full run details (loss curves, evaluation metrics) are saved per run under `results/model_and_results_*.json`; this one is `results/model_and_results_sa_4y_1.json`.
 
 ## Requirements
 
