@@ -28,7 +28,7 @@ class StandardizedAnomalies:
             print(f"File '{filename}' not found. No stats loaded.")
             
 
-    def normalize_t2m(self, lr_data, hr_data):
+    def normalize_t2m(self, lr_data, hr_data, fit=True):
         """
         Normalize the input low-resolution and high-resolution datasets for temperature using standardized anomalies.
 
@@ -38,20 +38,26 @@ class StandardizedAnomalies:
             Low-resolution observed data.
         hr_data : xr.Dataset
             High-resolution observed data.
+        fit : bool, optional
+            If True (default), compute the climatology (mean/std) from this data and
+            store it before normalizing. If False, reuse previously fitted statistics
+            instead of recomputing them.
+
+            IMPORTANT: to avoid data leakage, only ever call this with fit=True on the
+            training split. Call it with fit=False on validation/test splits so their
+            values do not influence the statistics used to normalize the training data.
 
         Returns:
         --------
         tuple of xr.Dataset
             Tuple containing the normalized low-resolution and high-resolution datasets for temperature using standardized anomalies.
         """
-        #normalized_lr = self.__normalize(data=lr_data, var_name='t2m', data_name='lr_t2m', dim=['time', 'longitude', 'latitude'])
-        #normalized_hr = self.__normalize(data=hr_data, var_name='t2m', data_name='hr_t2m', dim=['time', 'longitude', 'latitude'])
-        normalized_lr = self.__normalize(data=lr_data, var_name='t2m', data_name='lr_t2m', dim=['time'])
-        normalized_hr = self.__normalize(data=hr_data, var_name='t2m', data_name='hr_t2m', dim=['time'])
+        normalized_lr = self.__normalize(data=lr_data, var_name='t2m', data_name='lr_t2m', dim=['time'], fit=fit)
+        normalized_hr = self.__normalize(data=hr_data, var_name='t2m', data_name='hr_t2m', dim=['time'], fit=fit)
         return normalized_lr, normalized_hr
-    
 
-    def normalize_additional_features(self, data, var_names, data_source='lr_'):    
+
+    def normalize_additional_features(self, data, var_names, data_source='lr_', fit=True):
         """
         Normalize the input low-resolution and high-resolution datasets for additional features using standardized anomalies.
 
@@ -63,6 +69,10 @@ class StandardizedAnomalies:
             Names of the variables to be normalized.
         data_source : str, optional
             Prefix to be added to the normalized variable names. Default is 'lr_'.
+        fit : bool, optional
+            If True (default), compute statistics from this data before normalizing.
+            If False, reuse previously fitted statistics. See normalize_t2m for why
+            this matters for avoiding data leakage.
 
         Returns:
         --------
@@ -70,7 +80,7 @@ class StandardizedAnomalies:
             Normalized dataset for additional features using Standardized Anomalies.
         """
         for var_name in var_names:
-            data = self.__normalize(data=data, var_name=var_name, data_name=data_source+var_name, dim=['time', 'longitude', 'latitude'])
+            data = self.__normalize(data=data, var_name=var_name, data_name=data_source+var_name, dim=['time', 'longitude', 'latitude'], fit=fit)
 
         return data
     
@@ -83,7 +93,7 @@ class StandardizedAnomalies:
         self.__variable_stats = {}
 
 
-    def __normalize(self, data, var_name, data_name, dim=['time']):
+    def __normalize(self, data, var_name, data_name, dim=['time'], fit=True):
         """
         Normalize the input low-resolution and high-resolution datasets for a specific variable using standardized anomalies.
 
@@ -95,6 +105,9 @@ class StandardizedAnomalies:
             High-resolution observed data.
         var_name : list of str
             Names of the variables to be normalized. The first element is the variable name for lr_data, and the second element is for hr_data.
+        fit : bool, optional
+            If True, (re)compute climatology from this data. If False, reuse
+            previously stored climatology for this data_name.
 
         Returns:
         --------
@@ -104,10 +117,16 @@ class StandardizedAnomalies:
         normalized_data = data.copy()
         data_variable = data[var_name]
 
-        self.__calculate_climatology(data_variable, data_name, dim)
+        if fit:
+            self.__calculate_climatology(data_variable, data_name, dim)
+        elif data_name not in self.__variable_stats:
+            raise ValueError(
+                f"No fitted climatology for '{data_name}'. Call normalize with fit=True "
+                "on the training split before calling it with fit=False on other splits."
+            )
 
         # Standardize high- data and low-resolution data
-        normalized_variable = self.__calculate_standardized_anomalies(data_variable, data_name) 
+        normalized_variable = self.__calculate_standardized_anomalies(data_variable, data_name)
 
         # Update the original datasets with the normalized values
         normalized_data[var_name] = normalized_variable

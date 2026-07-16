@@ -116,9 +116,9 @@ class DownscalingPipeline:
         visualizer.difference_maps(hr_test_denormalized, result, filename_suffix)
         visualizer.comparison_histograms(hr_test_denormalized, result, filename_suffix)
 
-    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, stats_filename='./data/preprocessed_data', crop_region = [6.5, 42.5, 16.5, 54.0], reset_climatology_stats = True):
+    def preprocess_data(self, lr_data, hr_data, lr_lsm_z, hr_lsm_orog, stats_filename='./data/preprocessed_data', crop_region = [6.5, 42.5, 16.5, 54.0], reset_climatology_stats = True, fit = True):
         '''
-        Performs pre-processing step by cropping spatial dimension, 
+        Performs pre-processing step by cropping spatial dimension,
         and normalizes additional variables using standardized anomalies or min-max normalization.
 
         Parameters:
@@ -136,14 +136,31 @@ class DownscalingPipeline:
         crop_region : list, optional
             Spatial region to crop. Default is [6.5, 42.5, 16.5, 54.0].
         reset_climatology_stats : bool, optional
-            Whether to reset climatology statistics. Default is True.
+            Whether to reset climatology statistics. Default is True. Only takes
+            effect when fit=True (see below) — a reset is never applied on a
+            fit=False call, since that would discard the statistics it needs to reuse.
+        fit : bool, optional
+            If True (default), compute normalization statistics (mean/std or min/max)
+            from lr_data/hr_data and store them before normalizing.
+            If False, reuse previously fitted statistics instead of recomputing them.
+
+            IMPORTANT — to avoid data leakage: split your raw data into train/val/test
+            BEFORE calling preprocess_data, then call this method with fit=True on the
+            training split only, and fit=False on the validation/test splits, e.g.:
+
+                train_lr, train_hr = pipeline.preprocess_data(era5_train, cerra_train, ..., fit=True)
+                val_lr, val_hr     = pipeline.preprocess_data(era5_val, cerra_val, ..., fit=False)
+                test_lr, test_hr   = pipeline.preprocess_data(era5_test, cerra_test, ..., fit=False)
+
+            Calling preprocess_data on the full (not-yet-split) dataset and splitting
+            afterwards lets validation/test values leak into the training statistics.
 
         Returns:
         --------
         tuple of xr.Dataset
             Tuple containing normalized low-resolution temperature data and normalized high-resolution temperature data.
         '''
-        if (reset_climatology_stats):
+        if (reset_climatology_stats and fit):
             self.__normalizer.reset_variable_stats()
 
         lr_data, lr_lsm_z = sort_ds(lr_data), sort_ds(lr_lsm_z)
@@ -166,8 +183,8 @@ class DownscalingPipeline:
         hr_lsm_orog = hr_lsm_orog.sortby('latitude', ascending = False)
 
         # Normalize based on normalizer_type defined in constructor
-        anomalies_lr_data, anomalies_hr_data = self.__normalizer.normalize_t2m(lr_data, hr_data)
-        anomalies_lr_lsm_z = self.__normalizer.normalize_additional_features(lr_lsm_z, ['lsm','z'])
+        anomalies_lr_data, anomalies_hr_data = self.__normalizer.normalize_t2m(lr_data, hr_data, fit=fit)
+        anomalies_lr_lsm_z = self.__normalizer.normalize_additional_features(lr_lsm_z, ['lsm','z'], fit=fit)
         combined_anomalies_lr_data = combine_data(anomalies_lr_data, anomalies_lr_lsm_z, ['lsm', 'z'])
 
         self.__normalizer.store_stats_to_disk(stats_filename)
