@@ -9,6 +9,7 @@ from preprocessor.utility import crop_spatial_dimension, pad_lr_to_match_hr, sor
 from evaluation.metrics import DownscalingMetrics
 from evaluation.visualizer import EvaluationVisualization
 from downscaling.utility import  predictions_to_xarray_t2m, find_input_shape, set_global_seed
+from data_operations.utility import split_dataset
 
 import numpy as np 
 import tabulate
@@ -338,3 +339,68 @@ class DownscalingPipeline:
         if filename_suffix:
             history = self.history.history
             metric.save_evaluation_summary(filename_suffix, model_setup, history['loss'], history['val_loss'], metric_results, result_path)
+
+
+    def run_experiment(self, era5_t2m, cerra_t2m, era5_lsm_z, cerra_lsm_orog, model_setup, filename_suffix,
+                        crop_region=[6.5, 42.5, 16.5, 54.0], stats_filename='./data/preprocessed_data',
+                        result_path='./results/', test_size=0.11):
+        """
+        Run one full experiment end to end, from raw (unsplit, unnormalized) data to a
+        trained model and saved evaluation results.
+
+        This is the single place that enforces the correct order to avoid data leakage:
+        the raw data is split into train/val/test BEFORE normalization, normalization
+        statistics are fit on the training split only (fit=True), and the val/test
+        splits reuse those same statistics (fit=False). Previously, notebooks called
+        preprocess_data() on the full dataset and split afterwards, which let val/test
+        values leak into the statistics used to normalize the training data.
+
+        Parameters:
+        -----------
+        era5_t2m, cerra_t2m : xr.Dataset
+            Raw (not yet split, not yet normalized) low/high-resolution temperature data.
+        era5_lsm_z, cerra_lsm_orog : xr.Dataset
+            Raw low/high-resolution datasets containing additional variables (lsm, z/orog).
+        model_setup : dict
+            See run_downscaling_pipeline for the expected keys.
+        filename_suffix : str
+            Suffix used for saved plots/results for this run.
+        crop_region : list, optional
+            Spatial region to crop. Default is [6.5, 42.5, 16.5, 54.0].
+        stats_filename : str, optional
+            File path to store/load normalization statistics.
+        result_path : str, optional
+            Directory to save results. Default is './results/'.
+        test_size : float, optional
+            Fraction of the time range held out for validation, and again for test
+            (applied twice — see data_operations.utility.split_dataset). Default is 0.11.
+        """
+        lr_train, lr_val, lr_test, hr_train, hr_val, hr_test = split_dataset(era5_t2m, cerra_t2m, test_size=test_size)
+        lr_lsm_train, lr_lsm_val, lr_lsm_test, hr_orog_train, hr_orog_val, hr_orog_test = split_dataset(
+            era5_lsm_z, cerra_lsm_orog, test_size=test_size
+        )
+
+        train_lr, train_hr = self.preprocess_data(
+            lr_train, hr_train, lr_lsm_train, hr_orog_train,
+            stats_filename=stats_filename, crop_region=crop_region, fit=True
+        )
+        val_lr, val_hr = self.preprocess_data(
+            lr_val, hr_val, lr_lsm_val, hr_orog_val,
+            stats_filename=stats_filename, crop_region=crop_region, fit=False
+        )
+        test_lr, test_hr = self.preprocess_data(
+            lr_test, hr_test, lr_lsm_test, hr_orog_test,
+            stats_filename=stats_filename, crop_region=crop_region, fit=False
+        )
+
+        self.run_downscaling_pipeline(
+            normalization_type=self.__normalization_type,
+            train_data=[train_lr, train_hr],
+            val_data=[val_lr, val_hr],
+            lr_test_data=test_lr,
+            hr_test_data=test_hr,
+            model_setup=model_setup,
+            filename_suffix=filename_suffix,
+            stats_file=stats_filename,
+            result_path=result_path,
+        )
