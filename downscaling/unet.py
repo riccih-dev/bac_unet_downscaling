@@ -93,8 +93,11 @@ class UNetModel:
         ----------
         - Keras Tensor: The decoded tensor after the final convolutional layers.
         """
-        filters.reverse()
-        encoder_features.reverse()
+        # Reassign to reversed copies rather than filters.reverse()/encoder_features.reverse(),
+        # which would mutate the caller's lists in place (e.g. model_setup['filters'],
+        # later serialized to the results JSON, would end up reversed).
+        filters = list(reversed(filters))
+        encoder_features = list(reversed(encoder_features))
 
         for i in range(num_blocks): 
             # Upsampling or Transpose Convolution - increases the spatial resolution of the feature maps 
