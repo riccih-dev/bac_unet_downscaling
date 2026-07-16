@@ -1,5 +1,25 @@
+import os
+import random
+
 import xarray as xr
 import numpy as np
+import tensorflow as tf
+
+
+def set_global_seed(seed=42):
+    """
+    Seed Python, NumPy, and TensorFlow's random number generators for
+    reproducible runs (weight init, data shuffling, etc.).
+
+    Parameters:
+    -----------
+    seed : int, optional
+        The seed value to use. Default is 42.
+    """
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
 
 
 def predictions_to_xarray_t2m(input_data, predicted_data):

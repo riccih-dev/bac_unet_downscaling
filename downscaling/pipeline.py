@@ -8,7 +8,7 @@ from preprocessor.min_max_normalization import MinMaxNormalizatiton
 from preprocessor.utility import crop_spatial_dimension, pad_lr_to_match_hr, sort_ds, combine_data, extract_t2m_at_specific_times
 from evaluation.metrics import DownscalingMetrics
 from evaluation.visualizer import EvaluationVisualization
-from downscaling.utility import  predictions_to_xarray_t2m, find_input_shape
+from downscaling.utility import  predictions_to_xarray_t2m, find_input_shape, set_global_seed
 
 import numpy as np 
 import tabulate
@@ -16,7 +16,7 @@ import numpy as np
 
 
 class DownscalingPipeline: 
-    def __init__(self, normalization_type='standardized_anomalies'):
+    def __init__(self, normalization_type='standardized_anomalies', seed=42):
         """
         Constructor for DownscalingPipeline class.
 
@@ -25,12 +25,18 @@ class DownscalingPipeline:
         normalization_type : str, optional
             The type of normalization to be applied. Default is "standardized_anomalies".
             Valid values are "standardized_anomalies" or "min_max".
+        seed : int, optional
+            Seed for Python/NumPy/TensorFlow random number generators, set once on
+            construction for reproducible weight initialization and data shuffling.
+            Default is 42.
 
         Raises:
         -------
         ValueError
             If normalization_type is not one of the valid values.
         """
+        set_global_seed(seed)
+
         valid_normalization_types = ["standardized_anomalies", "min_max"]
 
         if normalization_type not in valid_normalization_types:
