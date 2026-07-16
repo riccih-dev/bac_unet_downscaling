@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 class DataGenerator:
@@ -21,19 +22,23 @@ class DataGenerator:
 
     def __len__(self):
         '''
-        returns the number of batches per epoch 
+        returns the number of batches per epoch
 
         Returns:
         --------
-        int: 
+        int:
             number of batches in one epoch
         '''
-        return self.num_samples // self.batch_size
+        return math.ceil(self.num_samples / self.batch_size)
 
     def generate_batches(self):
-        self.on_epoch_end()
-        while True: 
-            for start in range(0, self.num_samples, self.batch_size):   
+        while True:
+            # Reshuffle at the start of every full pass through the data, not just
+            # once at generator creation — otherwise the model sees the exact same
+            # batch order every "epoch". __len__ now matches how many batches one
+            # full pass actually yields, so this lines up with Keras epoch boundaries.
+            self.on_epoch_end()
+            for start in range(0, self.num_samples, self.batch_size):
                 end = min(start + self.batch_size, self.num_samples)
                 batch_indices = self.indices[start:end]
 
