@@ -14,7 +14,7 @@ class UNetModelConfiguration:
         - tf.keras.optimizers.Optimizer
             Configured Adam optimizer with a specific learning rate.
         """
-        return tf.optimizers.legacy.Adam(learning_rate=learning_rate_value)
+        return tf.keras.optimizers.Adam(learning_rate=learning_rate_value)
 
     def configure_callbacks(self, scheduler_type = 'exponential_decay'):
         """
